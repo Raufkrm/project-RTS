@@ -1,6 +1,6 @@
 use bevy::asset::AssetMetaCheck;
 use bevy::prelude::*;
-
+//empty 
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(AssetPlugin {
