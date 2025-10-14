@@ -1,140 +1,170 @@
 use bevy::prelude::*;
 use crate::app::AppState;
 
-const BG: Color = Color::srgb(0.06, 0.07, 0.10);
-const BTN: Color = Color::srgb(0.16, 0.18, 0.26);
-const BTN_HOVER: Color = Color::srgb(0.22, 0.24, 0.34);
-const BTN_PRESSED: Color = Color::srgb(0.10, 0.50, 0.32);
-const TXT: Color = Color::srgb(0.95, 0.96, 0.98);
-
+// --- markers ---
 #[derive(Component)] struct MenuRoot;
-#[derive(Component)] enum ButtonAction { Start, Quit }
+#[derive(Component)] struct PlayButton;
+#[derive(Component)] struct ModePanel;      // container that holds the two mode buttons
+#[derive(Component)] struct SingleButton;
+#[derive(Component)] struct MultiButton;
+#[derive(Component)] struct Disabled;       // simple "disabled" flag
 
 pub struct MenuPlugin;
 impl Plugin for MenuPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(OnEnter(AppState::Menu), setup_menu)
-           .add_systems(Update, button_interactions.run_if(in_state(AppState::Menu)))
-           .add_systems(OnExit(AppState::Menu), cleanup_menu);
+            .add_systems(Update, button_logic.run_if(in_state(AppState::Menu)))
+            .add_systems(OnExit(AppState::Menu), cleanup_menu);
     }
 }
 
 fn setup_menu(mut commands: Commands, assets: Res<AssetServer>) {
+    // UI camera (remove if you already spawn one elsewhere for the menu)
     commands.spawn(Camera2d);
 
-    commands.spawn((
-        Node {
-            width: Val::Percent(100.0),
-            height: Val::Percent(100.0),
-            justify_content: JustifyContent::Center,
-            align_items: AlignItems::Center,
-            ..default()
-        },
-        BackgroundColor(BG),
-        MenuRoot,
-    ))
-    .with_children(|root| {
-        root.spawn(Node {
-            width: Val::Px(380.0),
-            row_gap: Val::Px(16.0),
-            padding: UiRect::all(Val::Px(24.0)),
-            flex_direction: FlexDirection::Column,
-            align_items: AlignItems::Center,
-            ..default()
-        })
-        .with_children(|col| {
-            col.spawn((
+    let font: Handle<Font> = assets.load("fonts/arial.ttf");
+
+    // Root
+    commands
+        .spawn((
+            MenuRoot,
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                display: Display::Flex,
+                flex_direction: FlexDirection::Column,
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                row_gap: Val::Px(24.0),
+                ..default()
+            },
+            BackgroundColor(Color::srgb(0.08, 0.08, 0.10)),
+        ))
+        .with_children(|ui| {
+            // Title
+            ui.spawn((
                 Text::new("PROJECT RTS"),
-                TextFont { font: assets.load("fonts/arial.ttf"), font_size: 38.0, ..default() },
-                TextColor(TXT),
+                TextFont { font: font.clone(), font_size: 56.0, ..default() },
+                TextColor(Color::WHITE),
             ));
 
-            col.spawn((
+            // Play button (first screen)
+            ui.spawn((
+                PlayButton,
                 Button,
                 Node {
-                    width: Val::Px(240.0),
-                    height: Val::Px(56.0),
-                    justify_content: JustifyContent::Center,
-                    align_items: AlignItems::Center,
+                    padding: UiRect::axes(Val::Px(28.0), Val::Px(16.0)),
                     ..default()
                 },
-                BackgroundColor(BTN),
-                BorderRadius::all(Val::Px(10.0)),
-                ButtonAction::Start,
+                BackgroundColor(Color::srgb(0.95, 0.82, 0.10)),
+                BorderColor::all(Color::BLACK),
             ))
             .with_children(|b| {
                 b.spawn((
-                    Text::new("Start Game"),
-                    TextFont { font: assets.load("fonts/arial.ttf"), font_size: 24.0, ..default() },
-                    TextColor(TXT),
+                    Text::new("Play"),
+                    TextFont { font: font.clone(), font_size: 26.0, ..default() },
+                    TextColor(Color::BLACK),
                 ));
             });
 
-            #[cfg(not(target_arch = "wasm32"))]
-            col.spawn((
-                Button,
+            // Modes panel (hidden until Play is pressed)
+            ui.spawn((
+                ModePanel,
                 Node {
-                    width: Val::Px(240.0),
-                    height: Val::Px(56.0),
-                    justify_content: JustifyContent::Center,
-                    align_items: AlignItems::Center,
+                    display: Display::Flex,
+                    flex_direction: FlexDirection::Column,
+                    row_gap: Val::Px(16.0),
                     ..default()
                 },
-                BackgroundColor(BTN),
-                BorderRadius::all(Val::Px(10.0)),
-                ButtonAction::Quit,
+                Visibility::Hidden, // <-- show this after Play
             ))
-            .with_children(|b| {
-                b.spawn((
-                    Text::new("Quit"),
-                    TextFont { font: assets.load("fonts/arial.ttf"), font_size: 24.0, ..default() },
-                    TextColor(TXT),
-                ));
+            .with_children(|panel| {
+                // Singleplayer (enabled)
+                panel
+                    .spawn((
+                        SingleButton,
+                        Button,
+                        Node {
+                            padding: UiRect::axes(Val::Px(24.0), Val::Px(14.0)),
+                            ..default()
+                        },
+                        BackgroundColor(Color::srgb(0.95, 0.82, 0.10)),
+                        BorderColor::all(Color::BLACK),
+                    ))
+                    .with_children(|b| {
+                        b.spawn((
+                            Text::new("Singleplayer"),
+                            TextFont { font: font.clone(), font_size: 24.0, ..default() },
+                            TextColor(Color::BLACK),
+                        ));
+                    });
+
+                // Multiplayer (disabled + slightly transparent)
+                panel
+                    .spawn((
+                        MultiButton,
+                        Disabled, // mark as not clickable
+                        Button,
+                        Node {
+                            padding: UiRect::axes(Val::Px(24.0), Val::Px(14.0)),
+                            ..default()
+                        },
+                        // semi-transparent mustard
+                        BackgroundColor(Color::srgba(0.95, 0.82, 0.10, 0.45)),
+                        BorderColor::all(Color::BLACK),
+                    ))
+                    .with_children(|b| {
+                        b.spawn((
+                            Text::new("Multiplayer (coming soon)"),
+                            TextFont { font, font_size: 24.0, ..default() },
+                            // dim the label too
+                            TextColor(Color::srgba(0.0, 0.0, 0.0, 0.6)),
+                        ));
+                    });
             });
         });
-    });
 }
 
-fn button_interactions(
-    mut q: Query<(&Interaction, &mut BackgroundColor, &ButtonAction), (Changed<Interaction>, With<Button>)>,
-    mut next_state: ResMut<NextState<AppState>>,
+fn button_logic(
+    mut next: ResMut<NextState<AppState>>,
+    mut play_vis: Query<&mut Visibility, With<PlayButton>>,
+    mut panel_vis: Query<&mut Visibility, (With<ModePanel>, Without<PlayButton>)>,
+    mut buttons: Query<
+        (&Interaction, &mut BackgroundColor, Option<&Disabled>, Option<&SingleButton>, Entity),
+        (Changed<Interaction>, With<Button>)
+    >,
 ) {
-    for (interaction, mut bg, action) in &mut q {
-        match *interaction {
-            Interaction::Pressed => {
-                *bg = BackgroundColor(BTN_PRESSED);
-                match action {
-                    ButtonAction::Start => next_state.set(AppState::InGame),
-                    ButtonAction::Quit => {
-                        #[cfg(not(target_arch = "wasm32"))]
-                        std::process::exit(0);
-                    }
-                }
+    for (interaction, mut bg, disabled, is_single, entity) in &mut buttons {
+        // hover tint for enabled buttons
+        match (*interaction, disabled.is_some()) {
+            (Interaction::Hovered, false) => *bg = BackgroundColor(Color::srgb(1.0, 0.9, 0.2)),
+            (Interaction::None,    false) => *bg = BackgroundColor(Color::srgb(0.95, 0.82, 0.10)),
+            _ => {}
+        }
+
+        if *interaction == Interaction::Pressed {
+            if disabled.is_some() { continue; } // ignore disabled
+
+            // Play button → reveal panel, hide Play
+            if play_vis.get_mut(entity).is_ok() {
+                if let Ok(mut v_panel) = panel_vis.single_mut() { *v_panel = Visibility::Visible; }
+                if let Ok(mut v_play)  = play_vis.single_mut()  { *v_play  = Visibility::Hidden;  }
+                continue;
             }
-            Interaction::Hovered => *bg = BackgroundColor(BTN_HOVER),
-            Interaction::None => *bg = BackgroundColor(BTN),
+
+            // Singleplayer → enter game
+            if is_single.is_some() {
+                next.set(AppState::InGame);
+            }
         }
     }
 }
 
-fn cleanup_menu(
-    mut commands: Commands,
-    roots: Query<Entity, With<MenuRoot>>,
-    children_q: Query<&Children>,
-) {
-    for e in &roots {
-        despawn_recursive(&mut commands, e, &children_q);
+fn cleanup_menu(mut commands: Commands, q: Query<Entity, With<MenuRoot>>, cams: Query<Entity, With<Camera>>) {
+    for e in &q {
+        commands.entity(e).despawn();
+    }
+    for cam in &cams {
+        commands.entity(cam).despawn();
     }
 }
-
-// manual recursive despawn (no trait needed)
-fn despawn_recursive(commands: &mut Commands, entity: Entity, children_q: &Query<&Children>) {
-    if let Ok(children) = children_q.get(entity) {
-        // Children::iter() yields Entity by value in Bevy 0.17
-        for child in children.iter() {
-            despawn_recursive(commands, child, children_q);
-        }
-    }
-    commands.entity(entity).despawn();
-}
-
