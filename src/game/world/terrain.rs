@@ -3,9 +3,9 @@
 
 use crate::game::InGameRoot;
 
-use bevy::prelude::*;
 use bevy::asset::RenderAssetUsages;
 use bevy::mesh::Indices;
+use bevy::prelude::*;
 use bevy::render::render_resource::PrimitiveTopology;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -22,8 +22,8 @@ pub struct MapSettings {
 
     /// When > 0, the *effective* water level varies in space:
     /// effective_water = water_level + water_var_amp * (water_noise - 0.5)
-    pub water_var_amp: f32,   // try 0.04..0.12
-    pub water_var_freq: f32,  // try 0.005..0.02 (lower = larger basins)
+    pub water_var_amp: f32, // try 0.04..0.12
+    pub water_var_freq: f32, // try 0.005..0.02 (lower = larger basins)
 
     /// Height scale in world units.
     pub height_amplitude: f32,
@@ -80,8 +80,14 @@ fn h01(seed: u64, x: i32, y: i32) -> f32 {
     (hash_u32(seed, x, y) as f32) / (u32::MAX as f32)
 }
 
-#[inline] fn lerp(a: f32, b: f32, t: f32) -> f32 { a + (b - a) * t }
-#[inline] fn smoothstep(t: f32) -> f32 { t * t * (3.0 - 2.0 * t) }
+#[inline]
+fn lerp(a: f32, b: f32, t: f32) -> f32 {
+    a + (b - a) * t
+}
+#[inline]
+fn smoothstep(t: f32) -> f32 {
+    t * t * (3.0 - 2.0 * t)
+}
 
 fn value_noise(seed: u64, x: f32, y: f32) -> f32 {
     let x0 = x.floor() as i32;
@@ -153,6 +159,7 @@ pub fn reroll_system(
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut settings: ResMut<MapSettings>,
     roots: Query<Entity, With<MapRoot>>,
+    children_q: Query<&Children>,
 ) {
     if !keys.just_pressed(KeyCode::KeyR) {
         return;
@@ -160,7 +167,7 @@ pub fn reroll_system(
 
     // Despawn previous map(s). In 0.17, despawn() removes children too.
     for e in &roots {
-        commands.entity(e).despawn();
+        despawn_recursive(&mut commands, e, &children_q); // <-- use helper
     }
 
     // Randomize seed and global water level in the configured range
@@ -180,7 +187,12 @@ pub fn spawn_random_map(
     settings: &MapSettings,
 ) {
     let parent = commands
-        .spawn((MapRoot, InGameRoot, Transform::default(), Name::new("MapRoot")))
+        .spawn((
+            MapRoot,
+            InGameRoot,
+            Transform::default(),
+            Name::new("MapRoot"),
+        ))
         .id();
 
     let w = settings.width as usize;
@@ -250,11 +262,13 @@ pub fn spawn_random_map(
     }
 
     // terrain mesh
-    let mut terrain_mesh =
-        Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::RENDER_WORLD);
+    let mut terrain_mesh = Mesh::new(
+        PrimitiveTopology::TriangleList,
+        RenderAssetUsages::RENDER_WORLD,
+    );
     terrain_mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
-    terrain_mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL,   normals);
-    terrain_mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0,     uvs);
+    terrain_mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
+    terrain_mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
     terrain_mesh.insert_indices(Indices::U32(indices_vec));
 
     let terrain_mat = materials.add(StandardMaterial {
@@ -274,22 +288,28 @@ pub fn spawn_random_map(
         .id();
 
     // water (single quad at y=0)
-    let mut water =
-        Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::RENDER_WORLD);
+    let mut water = Mesh::new(
+        PrimitiveTopology::TriangleList,
+        RenderAssetUsages::RENDER_WORLD,
+    );
     let hw = 0.5 * total_w;
     let hh = 0.5 * total_h;
     water.insert_attribute(
         Mesh::ATTRIBUTE_POSITION,
         vec![
             [-hw, 0.0, -hh],
-            [ hw, 0.0, -hh],
-            [ hw, 0.0,  hh],
-            [-hw, 0.0,  hh],
+            [hw, 0.0, -hh],
+            [hw, 0.0, hh],
+            [-hw, 0.0, hh],
         ],
     );
     water.insert_attribute(Mesh::ATTRIBUTE_NORMAL, vec![[0.0, 1.0, 0.0]; 4]);
-    water.insert_attribute(Mesh::ATTRIBUTE_UV_0, vec![[0.0,0.0],[1.0,0.0],[1.0,1.0],[0.0,1.0]]);
-    water.insert_indices(Indices::U32(vec![0, 1, 2, 0, 2, 3]));
+    water.insert_attribute(
+        Mesh::ATTRIBUTE_UV_0,
+        vec![[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]],
+    );
+    // reversed winding (CCW from above)
+    water.insert_indices(Indices::U32(vec![0, 2, 1, 0, 3, 2]));
 
     let water_mat = materials.add(StandardMaterial {
         base_color: Color::srgba(0.15, 0.35, 0.85, 0.7),
@@ -308,5 +328,15 @@ pub fn spawn_random_map(
         ))
         .id();
 
-    commands.entity(parent).add_children(&[terrain_entity, water_entity]);
+    commands
+        .entity(parent)
+        .add_children(&[terrain_entity, water_entity]);
+}
+fn despawn_recursive(commands: &mut Commands, entity: Entity, children_q: &Query<&Children>) {
+    if let Ok(children) = children_q.get(entity) {
+        for child in children.iter() {
+            despawn_recursive(commands, child, children_q); // <- just child
+        }
+    }
+    commands.entity(entity).despawn();
 }

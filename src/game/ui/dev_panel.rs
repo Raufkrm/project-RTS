@@ -1,19 +1,18 @@
-use bevy::prelude::*;
 use bevy::asset::RenderAssetUsages;
+use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy::ui::widget::ImageNode;
 
-use crate::game::world::terrain::{MapSettings, MapRoot, spawn_random_map};
+use crate::game::world::terrain::{spawn_random_map, MapRoot, MapSettings};
 
 pub struct DevPanelPlugin;
 impl Plugin for DevPanelPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<DevUiState>()
-            .add_systems(
-                Update,
-                (toggle_panel, update_fps, panel_buttons, hotkeys)
-                    .run_if(in_state(crate::app::AppState::InGame)),
-            );
+        app.init_resource::<DevUiState>().add_systems(
+            Update,
+            (toggle_panel, update_fps, panel_buttons, hotkeys)
+                .run_if(in_state(crate::app::AppState::InGame)),
+        );
     }
 }
 
@@ -25,20 +24,33 @@ struct DevUiState {
 }
 impl Default for DevUiState {
     fn default() -> Self {
-        Self { open: true, fps_smooth: 0.0 }
+        Self {
+            open: true,
+            fps_smooth: 0.0,
+        }
     }
 }
 
-#[derive(Component)] struct DevPanelRoot;
-#[derive(Component)] struct FpsText;
-#[derive(Component)] struct SeedText;
-#[derive(Component)] struct InfoText;
+#[derive(Component)]
+struct DevPanelRoot;
+#[derive(Component)]
+struct FpsText;
+#[derive(Component)]
+struct SeedText;
+#[derive(Component)]
+struct InfoText;
 
-#[derive(Component)] struct DevMapRoot;      // top-right container
-#[derive(Component)] struct HeightmapWidget;  // image inside it
+#[derive(Component)]
+struct DevMapRoot; // top-right container
+#[derive(Component)]
+struct HeightmapWidget; // image inside it
 
 #[derive(Component, Clone, Copy)]
-enum ButtonKind { Reroll, WaterMinus, WaterPlus }
+enum ButtonKind {
+    Reroll,
+    WaterMinus,
+    WaterPlus,
+}
 
 // ---------- systems ----------
 fn toggle_panel(
@@ -83,26 +95,42 @@ fn toggle_panel(
                 .with_children(|c| {
                     c.spawn((
                         Text::new("DEV PANEL"),
-                        TextFont { font: font.clone(), font_size: 16.0, ..default() },
-                        TextColor(Color::srgb(1.0,1.0,1.0)),
+                        TextFont {
+                            font: font.clone(),
+                            font_size: 16.0,
+                            ..default()
+                        },
+                        TextColor(Color::srgb(1.0, 1.0, 1.0)),
                     ));
                     c.spawn((
                         FpsText,
                         Text::new("FPS: ..."),
-                        TextFont { font: font.clone(), font_size: 14.0, ..default() },
-                        TextColor(Color::srgb(0.8,0.8,0.8)),
+                        TextFont {
+                            font: font.clone(),
+                            font_size: 14.0,
+                            ..default()
+                        },
+                        TextColor(Color::srgb(0.8, 0.8, 0.8)),
                     ));
                     c.spawn((
                         SeedText,
                         Text::new("Seed: ..."),
-                        TextFont { font: font.clone(), font_size: 14.0, ..default() },
-                        TextColor(Color::srgb(0.8,0.8,0.8)),
+                        TextFont {
+                            font: font.clone(),
+                            font_size: 14.0,
+                            ..default()
+                        },
+                        TextColor(Color::srgb(0.8, 0.8, 0.8)),
                     ));
                     c.spawn((
                         InfoText,
                         Text::new("Size: ...   Water: ..."),
-                        TextFont { font: font.clone(), font_size: 14.0, ..default() },
-                        TextColor(Color::srgb(0.8,0.8,0.8)),
+                        TextFont {
+                            font: font.clone(),
+                            font_size: 14.0,
+                            ..default()
+                        },
+                        TextColor(Color::srgb(0.8, 0.8, 0.8)),
                     ));
 
                     // Buttons row
@@ -111,55 +139,76 @@ fn toggle_panel(
                         column_gap: Val::Px(8.0),
                         ..default()
                     },))
-                    .with_children(|row| {
-                        // Reroll
-                        row.spawn((
-                            ButtonKind::Reroll,
-                            Button,
-                            Node { padding: UiRect::axes(Val::Px(10.0), Val::Px(6.0)), ..default() },
-                            BackgroundColor(Color::srgb(0.95,0.82,0.10)),
-                            BorderColor::all(Color::BLACK),
-                        ))
-                        .with_children(|b| {
-                            b.spawn((
-                                Text::new("Reroll [R]"),
-                                TextFont { font: font.clone(), font_size: 14.0, ..default() },
-                                TextColor(Color::BLACK),
-                            ));
-                        });
+                        .with_children(|row| {
+                            // Reroll
+                            row.spawn((
+                                ButtonKind::Reroll,
+                                Button,
+                                Node {
+                                    padding: UiRect::axes(Val::Px(10.0), Val::Px(6.0)),
+                                    ..default()
+                                },
+                                BackgroundColor(Color::srgb(0.95, 0.82, 0.10)),
+                                BorderColor::all(Color::BLACK),
+                            ))
+                            .with_children(|b| {
+                                b.spawn((
+                                    Text::new("Reroll [R]"),
+                                    TextFont {
+                                        font: font.clone(),
+                                        font_size: 14.0,
+                                        ..default()
+                                    },
+                                    TextColor(Color::BLACK),
+                                ));
+                            });
 
-                        // Water -
-                        row.spawn((
-                            ButtonKind::WaterMinus,
-                            Button,
-                            Node { padding: UiRect::axes(Val::Px(10.0), Val::Px(6.0)), ..default() },
-                            BackgroundColor(Color::srgb(0.95,0.82,0.10)),
-                            BorderColor::all(Color::BLACK),
-                        ))
-                        .with_children(|b| {
-                            b.spawn((
-                                Text::new("Water -"),
-                                TextFont { font: font.clone(), font_size: 14.0, ..default() },
-                                TextColor(Color::BLACK),
-                            ));
-                        });
+                            // Water -
+                            row.spawn((
+                                ButtonKind::WaterMinus,
+                                Button,
+                                Node {
+                                    padding: UiRect::axes(Val::Px(10.0), Val::Px(6.0)),
+                                    ..default()
+                                },
+                                BackgroundColor(Color::srgb(0.95, 0.82, 0.10)),
+                                BorderColor::all(Color::BLACK),
+                            ))
+                            .with_children(|b| {
+                                b.spawn((
+                                    Text::new("Water -"),
+                                    TextFont {
+                                        font: font.clone(),
+                                        font_size: 14.0,
+                                        ..default()
+                                    },
+                                    TextColor(Color::BLACK),
+                                ));
+                            });
 
-                        // Water +
-                        row.spawn((
-                            ButtonKind::WaterPlus,
-                            Button,
-                            Node { padding: UiRect::axes(Val::Px(10.0), Val::Px(6.0)), ..default() },
-                            BackgroundColor(Color::srgb(0.95,0.82,0.10)),
-                            BorderColor::all(Color::BLACK),
-                        ))
-                        .with_children(|b| {
-                            b.spawn((
-                                Text::new("Water +"),
-                                TextFont { font, font_size: 14.0, ..default() },
-                                TextColor(Color::BLACK),
-                            ));
+                            // Water +
+                            row.spawn((
+                                ButtonKind::WaterPlus,
+                                Button,
+                                Node {
+                                    padding: UiRect::axes(Val::Px(10.0), Val::Px(6.0)),
+                                    ..default()
+                                },
+                                BackgroundColor(Color::srgb(0.95, 0.82, 0.10)),
+                                BorderColor::all(Color::BLACK),
+                            ))
+                            .with_children(|b| {
+                                b.spawn((
+                                    Text::new("Water +"),
+                                    TextFont {
+                                        font,
+                                        font_size: 14.0,
+                                        ..default()
+                                    },
+                                    TextColor(Color::BLACK),
+                                ));
+                            });
                         });
-                    });
                 });
         }
 
@@ -203,7 +252,10 @@ fn update_fps(
         t.0 = format!("Seed: {}", map.seed);
     }
     if let Ok(mut t) = info_q.single_mut() {
-        t.0 = format!("Size: {}×{}   Water: {:.2}", map.width, map.height, map.water_level);
+        t.0 = format!(
+            "Size: {}×{}   Water: {:.2}",
+            map.width, map.height, map.water_level
+        );
     }
 }
 
@@ -212,7 +264,10 @@ fn panel_buttons(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut map: ResMut<MapSettings>,
-    mut q: Query<(&Interaction, &mut BackgroundColor, &ButtonKind), (Changed<Interaction>, With<Button>)>,
+    mut q: Query<
+        (&Interaction, &mut BackgroundColor, &ButtonKind),
+        (Changed<Interaction>, With<Button>),
+    >,
     roots: Query<Entity, With<MapRoot>>,
     children_q: Query<&Children>,
 
@@ -224,21 +279,30 @@ fn panel_buttons(
 
     for (interaction, mut bg, kind) in &mut q {
         match *interaction {
-            Interaction::Hovered => *bg = BackgroundColor(Color::srgb(1.0,0.9,0.2)),
-            Interaction::None    => *bg = BackgroundColor(Color::srgb(0.95,0.82,0.10)),
+            Interaction::Hovered => *bg = BackgroundColor(Color::srgb(1.0, 0.9, 0.2)),
+            Interaction::None => *bg = BackgroundColor(Color::srgb(0.95, 0.82, 0.10)),
             Interaction::Pressed => {
-                *bg = BackgroundColor(Color::srgb(0.9,0.8,0.1));
+                *bg = BackgroundColor(Color::srgb(0.9, 0.8, 0.1));
                 match kind {
-                    ButtonKind::Reroll => { map.seed = map.seed.wrapping_add(1); changed = true; }
-                    ButtonKind::WaterMinus => { map.water_level = (map.water_level - 0.02).clamp(0.05, 0.9); changed = true; }
-                    ButtonKind::WaterPlus  => { map.water_level = (map.water_level + 0.02).clamp(0.05, 0.9); changed = true; }
+                    ButtonKind::Reroll => {
+                        map.seed = map.seed.wrapping_add(1);
+                        changed = true;
+                    }
+                    ButtonKind::WaterMinus => {
+                        map.water_level = (map.water_level - 0.02).clamp(0.05, 0.9);
+                        changed = true;
+                    }
+                    ButtonKind::WaterPlus => {
+                        map.water_level = (map.water_level + 0.02).clamp(0.05, 0.9);
+                        changed = true;
+                    }
                 }
             }
         }
     }
 
     if changed {
-        if let Ok(e) = roots.single() {
+        for e in &roots {
             despawn_recursive(&mut commands, e, &children_q);
         }
         spawn_random_map(&mut commands, &mut meshes, &mut materials, &map);
@@ -266,7 +330,7 @@ fn hotkeys(
 ) {
     if keys.just_pressed(KeyCode::KeyR) {
         map.seed = map.seed.wrapping_add(1);
-        if let Ok(e) = roots.single() {
+        for e in &roots {
             despawn_recursive(&mut commands, e, &children_q);
         }
         spawn_random_map(&mut commands, &mut meshes, &mut materials, &map);
@@ -302,13 +366,24 @@ fn hm_hash(seed: u64, x: i32, y: i32) -> u32 {
     v ^= v >> 33;
     (v & 0xFFFF_FFFF) as u32
 }
-#[inline] fn hm_h01(seed: u64, x: i32, y: i32) -> f32 { (hm_hash(seed, x, y) as f32) / (u32::MAX as f32) }
-#[inline] fn hm_lerp(a: f32, b: f32, t: f32) -> f32 { a + (b - a) * t }
-#[inline] fn hm_smooth(t: f32) -> f32 { t * t * (3.0 - 2.0 * t) }
+#[inline]
+fn hm_h01(seed: u64, x: i32, y: i32) -> f32 {
+    (hm_hash(seed, x, y) as f32) / (u32::MAX as f32)
+}
+#[inline]
+fn hm_lerp(a: f32, b: f32, t: f32) -> f32 {
+    a + (b - a) * t
+}
+#[inline]
+fn hm_smooth(t: f32) -> f32 {
+    t * t * (3.0 - 2.0 * t)
+}
 
 fn hm_value(seed: u64, x: f32, y: f32) -> f32 {
-    let x0 = x.floor() as i32; let y0 = y.floor() as i32;
-    let x1 = x0 + 1;          let y1 = y0 + 1;
+    let x0 = x.floor() as i32;
+    let y0 = y.floor() as i32;
+    let x1 = x0 + 1;
+    let y1 = y0 + 1;
     let tx = hm_smooth(x - x.floor());
     let ty = hm_smooth(y - y.floor());
     let v00 = hm_h01(seed, x0, y0);
@@ -335,8 +410,14 @@ fn hm_fbm(seed: u64, x: f32, y: f32, base_freq: f32) -> f32 {
 }
 
 fn hm_effective_water(map: &MapSettings, seed: u64, wx: f32, wz: f32) -> f32 {
-    if map.water_var_amp <= 0.0 { return map.water_level; }
-    let mask = hm_value(seed.wrapping_add(0xBEEF), wx * map.water_var_freq, wz * map.water_var_freq);
+    if map.water_var_amp <= 0.0 {
+        return map.water_level;
+    }
+    let mask = hm_value(
+        seed.wrapping_add(0xBEEF),
+        wx * map.water_var_freq,
+        wz * map.water_var_freq,
+    );
     map.water_level + map.water_var_amp * (mask - 0.5)
 }
 
@@ -374,7 +455,11 @@ fn generate_heightmap_image(map: &MapSettings, images: &mut Assets<Image>) -> Ha
     }
 
     let img = Image::new(
-        Extent3d { width: w as u32, height: h as u32, depth_or_array_layers: 1 },
+        Extent3d {
+            width: w as u32,
+            height: h as u32,
+            depth_or_array_layers: 1,
+        },
         TextureDimension::D2,
         px,
         TextureFormat::Rgba8UnormSrgb,
@@ -384,11 +469,7 @@ fn generate_heightmap_image(map: &MapSettings, images: &mut Assets<Image>) -> Ha
     images.add(img)
 }
 
-fn spawn_heightmap_widget(
-    commands: &mut Commands,
-    images: &mut Assets<Image>,
-    map: &MapSettings,
-) {
+fn spawn_heightmap_widget(commands: &mut Commands, images: &mut Assets<Image>, map: &MapSettings) {
     let hm = generate_heightmap_image(map, images);
     commands
         .spawn((

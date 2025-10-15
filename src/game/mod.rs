@@ -23,11 +23,7 @@ fn setup_world(
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut map: ResMut<world::terrain::MapSettings>,  // <-- use the resource
 ) {
-    commands.spawn((
-        Camera3d::default(),
-        Transform::from_xyz(0.0, 40.0, 40.0).looking_at(Vec3::ZERO, Vec3::Y),
-    ));
-    commands.spawn(DirectionalLight::default());
+    
 
     let mesh = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
     let mat = materials.add(Color::srgb(0.2, 0.6, 0.9));
