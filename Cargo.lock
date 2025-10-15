@@ -3617,6 +3617,7 @@ name = "project-rts"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "bevy_mesh",
 ]
 
 [[package]]

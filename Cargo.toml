@@ -7,6 +7,7 @@ edition = "2021"
 bevy = { version = "0.17", default-features = true, features = [
   "bevy_asset","bevy_audio","bevy_pbr","bevy_sprite","bevy_text","bevy_ui","bevy_winit","png","x11"
 ] }
+bevy_mesh = "0.17.2"
 
 [profile.release]
 lto = "thin"
