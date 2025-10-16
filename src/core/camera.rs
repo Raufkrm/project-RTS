@@ -32,7 +32,7 @@ fn despawn_existing_cameras(mut commands: Commands, cams: Query<Entity, With<Cam
 }
 
 fn spawn_editor_camera(mut commands: Commands) {
-    // Sun for shading inspection
+    // Sun
     commands.spawn((
         DirectionalLight {
             shadows_enabled: true,
@@ -86,7 +86,7 @@ fn update_editor_camera(
     buttons: Res<ButtonInput<MouseButton>>,
     keys: Res<ButtonInput<KeyCode>>,
     mut wheel: MessageReader<MouseWheel>,
-    windows: Query<&Window, With<PrimaryWindow>>,
+    windows: Query<&Window, With<PrimaryWindow>>, // <-- fixed
     mut q: Query<(&mut Transform, &mut EditorCamera)>,
 ) {
     let dt = time.delta_secs();

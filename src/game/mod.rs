@@ -5,15 +5,43 @@ use crate::app::AppState;
 pub mod world;
 pub mod ui;
 
-#[derive(Component)] struct InGameRoot;
+use crate::game::world::terrain_stream::{
+    WantedPatches, compute_wanted_patches, apply_patch_streaming,
+};
+use crate::game::world::sampling::{FlatSamplerRes, FlatSampler};
+use crate::game::world::patch::PatchGrid;
+
+use world::terrain::MapSettings;
+
+#[derive(Component)]
+struct InGameRoot;
 
 pub struct GamePlugin;
 impl Plugin for GamePlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<world::terrain::MapSettings>()     // <-- add
-           .add_plugins(ui::dev_panel::DevPanelPlugin)         // <-- add
-           .add_systems(OnEnter(AppState::InGame), setup_world)
-           .add_systems(OnExit(AppState::InGame), cleanup_world);
+        // resources
+        app.init_resource::<MapSettings>();
+        app.insert_resource(PatchGrid::default());
+        app.insert_resource(FlatSamplerRes(FlatSampler {
+            seed: 12345,
+            base_freq: 0.0015,
+            height_amp: 40.0,
+        }));
+        app.init_resource::<WantedPatches>();
+
+        // dev panel
+        app.add_plugins(ui::dev_panel::DevPanelPlugin);
+
+        // lifecycle
+        app.add_systems(OnEnter(AppState::InGame), setup_world);
+        app.add_systems(OnExit(AppState::InGame), cleanup_world);
+
+        // streaming
+        app.add_systems(
+            Update,
+            (compute_wanted_patches, apply_patch_streaming)
+                .run_if(in_state(AppState::InGame)),
+        );
     }
 }
 
@@ -21,27 +49,25 @@ fn setup_world(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    mut map: ResMut<world::terrain::MapSettings>,  // <-- use the resource
+    mut map: ResMut<MapSettings>,
 ) {
-    
-
+    // small prop so the scene isn't empty
     let mesh = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
-    let mat = materials.add(Color::srgb(0.2, 0.6, 0.9));
+    let mat  = materials.add(Color::srgb(0.2, 0.6, 0.9));
     commands.spawn((
         Mesh3d(mesh),
         MeshMaterial3d(mat),
         Transform::from_xyz(0.0, 0.5, 3.5),
         InGameRoot,
+        Name::new("DemoCube"),
     ));
 
-    // fresh seed per run
+    // new seed per run
     use std::time::{SystemTime, UNIX_EPOCH};
     let nanos = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
     map.seed = (nanos & 0xFFFF_FFFF_FFFF_FFFF) as u64;
 
-    // spawn map using the shared resource
-    use world::terrain::{spawn_random_map};
-    spawn_random_map(&mut commands, &mut meshes, &mut materials, &map);
+    // NOTE: streaming patches will appear automatically
 }
 
 fn cleanup_world(
@@ -58,8 +84,10 @@ fn cleanup_world(
     }
 }
 
+// Works on 0.17 (no Commands::despawn_recursive)
 fn despawn_recursive(commands: &mut Commands, entity: Entity, children_q: &Query<&Children>) {
     if let Ok(children) = children_q.get(entity) {
+        // Each item from `children.iter()` is `Entity` already.
         for child in children.iter() {
             despawn_recursive(commands, child, children_q);
         }
