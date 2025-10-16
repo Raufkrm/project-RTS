@@ -15,6 +15,10 @@ pub struct PatchGrid {
 
 impl Default for PatchGrid {
     fn default() -> Self {
-        Self { patch_size_m: 256.0, visible_radius: 3, verts_per_side: 64 }
+        Self {
+            patch_size_m: 256.0,
+            visible_radius: 4,  // ← was 3
+            verts_per_side: 64,
+        }
     }
 }

@@ -33,8 +33,8 @@ pub fn build_app() -> App {
 
     // If you still want the legacy one-piece terrain on enter (optional).
     // You may comment these two lines once your streamed patches are visible.
-    app.add_systems(OnEnter(AppState::InGame), spawn_map_system);
-    app.add_systems(OnExit(AppState::InGame), despawn_map_system);
+    //app.add_systems(OnEnter(AppState::InGame), spawn_map_system);
+    //app.add_systems(OnExit(AppState::InGame), despawn_map_system);
 
     // Reroll on R while in-game (DevPanel uses this)
     app.add_systems(Update, reroll_system.run_if(in_state(AppState::InGame)));
