@@ -3,7 +3,6 @@ use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 
 use crate::app::AppState;
-use crate::game::world::sampling::{FlatSamplerRes, WorldSampler}; // <- import the trait
 
 pub struct EditorCameraPlugin;
 impl Plugin for EditorCameraPlugin {
@@ -19,31 +18,33 @@ impl Plugin for EditorCameraPlugin {
 
 #[derive(Component)]
 pub struct EditorCamera {
+    // current (rendered) state
     pub yaw: f32,
     pub pitch: f32,
     pub radius: f32,
     pub focus: Vec3,
+
+    // targets for smooth damping
+    pub target_yaw: f32,
+    pub target_pitch: f32,
+    pub target_radius: f32,
+    pub target_focus: Vec3,
+
     pub last_cursor: Option<Vec2>,
 }
 
+// --- lifecycle ---
 fn despawn_existing_cameras(mut commands: Commands, cams: Query<Entity, With<Camera3d>>) {
     for e in &cams {
         commands.entity(e).despawn();
     }
 }
 
-fn spawn_editor_camera(mut commands: Commands, sampler: Res<FlatSamplerRes>) {
-    // Ambient so scene isn't too dark (Bevy 0.17 requires affects_lightmapped_meshes)
-    commands.insert_resource(AmbientLight {
-        color: Color::srgb(0.65, 0.65, 0.7),
-        brightness: 800.0,
-        affects_lightmapped_meshes: true,
-    });
-
-    // Sun
+fn spawn_editor_camera(mut commands: Commands) {
+    // Sun for shading inspection
     commands.spawn((
         DirectionalLight {
-            shadows_enabled: false,
+            shadows_enabled: true,
             illuminance: 25_000.0,
             ..default()
         },
@@ -51,15 +52,11 @@ fn spawn_editor_camera(mut commands: Commands, sampler: Res<FlatSamplerRes>) {
         Name::new("Sun"),
     ));
 
-    // Orbit camera
+    // Default orbit setup
     let yaw = -0.65;
     let pitch = -0.45;
     let radius = 28.0;
-
-    // Start above ground at (0,0)
-    let ground_y = sampler.0.sample(0.0, 0.0).height;
-    let focus = Vec3::new(0.0, ground_y + 5.0, 0.0);
-
+    let focus = Vec3::ZERO;
     let (eye, up) = orbit_to_eye(yaw, pitch, radius, focus);
 
     commands.spawn((
@@ -70,6 +67,10 @@ fn spawn_editor_camera(mut commands: Commands, sampler: Res<FlatSamplerRes>) {
             pitch,
             radius,
             focus,
+            target_yaw: yaw,
+            target_pitch: pitch,
+            target_radius: radius,
+            target_focus: focus,
             last_cursor: None,
         },
         Name::new("EditorCamera"),
@@ -86,13 +87,27 @@ fn despawn_editor_camera(
     }
 }
 
+// --- math helpers ---
 #[inline]
 fn orbit_to_eye(yaw: f32, pitch: f32, radius: f32, focus: Vec3) -> (Vec3, Vec3) {
     let dir = Quat::from_euler(EulerRot::YXZ, yaw, pitch, 0.0) * Vec3::NEG_Z;
-    let eye = focus - dir * radius.max(0.1);
+    let eye = focus - dir * radius.max(0.0001);
     (eye, Vec3::Y)
 }
 
+// critically-damped smoothing: new = lerp(current, target, 1 - e^{-dt/tau})
+#[inline]
+fn smooth_to(current: f32, target: f32, dt: f32, tau: f32) -> f32 {
+    let a = (-dt / tau.max(1e-5)).exp();
+    target + (current - target) * a
+}
+#[inline]
+fn smooth_to_v(current: Vec3, target: Vec3, dt: f32, tau: f32) -> Vec3 {
+    let a = (-dt / tau.max(1e-5)).exp();
+    target + (current - target) * a
+}
+
+// --- controls ---
 fn update_editor_camera(
     time: Res<Time>,
     buttons: Res<ButtonInput<MouseButton>>,
@@ -100,7 +115,6 @@ fn update_editor_camera(
     mut wheel: MessageReader<MouseWheel>,
     windows: Query<&Window, With<PrimaryWindow>>,
     mut q: Query<(&mut Transform, &mut EditorCamera)>,
-    sampler: Res<FlatSamplerRes>,
 ) {
     let dt = time.delta_secs();
     let Ok(window) = windows.single() else { return; };
@@ -111,82 +125,99 @@ fn update_editor_camera(
         Err(_) => return,
     };
 
-    // rotate (RMB)
+    // -------- Input collection --------
+
+    // Orbit (RMB)
     if buttons.pressed(MouseButton::Right) {
         if let (Some(prev), Some(now)) = (cam.last_cursor, cursor) {
-            let d = now - prev;
+            let delta = now - prev;
             let sens = 0.01;
-            cam.yaw -= d.x * sens;
-            cam.pitch -= d.y * sens;
-            cam.pitch = cam.pitch.clamp(-1.54, 1.54);
+            cam.target_yaw   -= delta.x * sens;
+            cam.target_pitch -= delta.y * sens;
+            cam.target_pitch = cam.target_pitch.clamp(-1.54, 1.54);
         }
     }
 
-    // pan (MMB)
+    // Pan (MMB) — scale with distance
     if buttons.pressed(MouseButton::Middle) {
         if let (Some(prev), Some(now)) = (cam.last_cursor, cursor) {
-            let d = (now - prev) * 0.01 * cam.radius.max(1.0);
-            let right = Quat::from_rotation_y(cam.yaw) * Vec3::X;
+            let delta = (now - prev) * 0.01 * cam.target_radius.max(0.01);
+            let right = Quat::from_rotation_y(cam.target_yaw) * Vec3::X;
             let up = Vec3::Y;
-            cam.focus -= right * d.x;
-            cam.focus += up * d.y;
+            cam.target_focus -= right * delta.x;
+            cam.target_focus += up * delta.y;
         }
     }
+
     cam.last_cursor = cursor;
 
-    // zoom (wheel or Z/X)
-    let mut zoom = 0.0f32;
+    // Zoom (wheel or Z/X). Use multiplicative scaling for true continuous, clamp-free zoom.
+    // No max radius; only tiny epsilon min to avoid flipping through focus.
+    let mut zoom_steps = 0.0f32;
     for evt in wheel.read() {
-        zoom += match evt.unit {
-            MouseScrollUnit::Line => evt.y * -1.0,
+        zoom_steps += match evt.unit {
+            MouseScrollUnit::Line => evt.y * -1.0,     // invert if desired
             MouseScrollUnit::Pixel => evt.y * -0.05,
         };
     }
-    if keys.pressed(KeyCode::KeyZ) { zoom += -10.0 * dt; }
-    if keys.pressed(KeyCode::KeyX) { zoom += 10.0 * dt; }
-    cam.radius = (cam.radius * (1.0 + zoom * 0.1)).clamp(2.0, 500.0);
+    if keys.pressed(KeyCode::KeyZ) { zoom_steps += -10.0 * dt; }
+    if keys.pressed(KeyCode::KeyX) { zoom_steps +=  10.0 * dt; }
 
-    // WASD/QE move on ground plane (XZ)
-    let base = 10.0;
-    let speed = if keys.pressed(KeyCode::ShiftLeft) {
-        base * 4.0
-    } else if keys.pressed(KeyCode::ControlLeft) {
-        base * 0.25
-    } else {
-        base
-    };
+    if zoom_steps != 0.0 {
+        // exponential zoom factor; small steps near surface, bigger far away
+        // factor < 1 => zoom in, factor > 1 => zoom out
+        let factor = (1.0 + zoom_steps * 0.15).max(0.01);
+        cam.target_radius = (cam.target_radius * factor).max(0.001);
+    }
 
-    let yaw_rot = Quat::from_rotation_y(cam.yaw);
-    let fwd = (yaw_rot * Vec3::NEG_Z).with_y(0.0).normalize_or_zero();
+    // WASD/QE free move (moves the focus). Speed scales with radius for consistent feel.
+    let mut move_vec = Vec3::ZERO;
+    let yaw_rot = Quat::from_rotation_y(cam.target_yaw);
+    let forward = (yaw_rot * Vec3::NEG_Z).with_y(0.0).normalize_or_zero();
     let right = yaw_rot * Vec3::X;
 
-    let mut mv = Vec3::ZERO;
-    if keys.pressed(KeyCode::KeyW) { mv += fwd; }
-    if keys.pressed(KeyCode::KeyS) { mv -= fwd; }
-    if keys.pressed(KeyCode::KeyA) { mv -= right; }
-    if keys.pressed(KeyCode::KeyD) { mv += right; }
-    if mv.length_squared() > 0.0 {
-        cam.focus += mv.normalize() * speed * dt;
+    if keys.pressed(KeyCode::KeyW) { move_vec += forward; }
+    if keys.pressed(KeyCode::KeyS) { move_vec -= forward; }
+    if keys.pressed(KeyCode::KeyA) { move_vec -= right; }
+    if keys.pressed(KeyCode::KeyD) { move_vec += right; }
+    if keys.pressed(KeyCode::KeyQ) { move_vec.y -= 1.0; }
+    if keys.pressed(KeyCode::KeyE) { move_vec.y += 1.0; }
+
+    if move_vec.length_squared() > 0.0 {
+        let base = 0.6; // tune feel
+        // scale with distance, but give a little minimum for close-up work
+        let speed = (cam.target_radius * base).max(2.0);
+        let speed = if keys.pressed(KeyCode::ShiftLeft) {
+            speed * 4.0
+        } else if keys.pressed(KeyCode::ControlLeft) {
+            speed * 0.25
+        } else { speed };
+        cam.target_focus += move_vec.normalize() * speed * dt;
     }
 
-    // Keep focus above ground (smoothly)
-    let ground_y = sampler.0.sample(cam.focus.x, cam.focus.z).height;
-    let desired = ground_y + 5.0; // clearance
-    cam.focus.y = cam.focus.y + (desired - cam.focus.y) * 0.15;
-
-    // focus/reset
+    // Focus / reset shortcuts
     if keys.just_pressed(KeyCode::KeyF) {
-        let gy = sampler.0.sample(0.0, 0.0).height;
-        cam.focus = Vec3::new(0.0, gy + 5.0, 0.0);
+        cam.target_focus = Vec3::ZERO;
     }
     if keys.pressed(KeyCode::ShiftRight) && keys.just_pressed(KeyCode::KeyR) {
-        let gy = sampler.0.sample(0.0, 0.0).height;
-        cam.yaw = -0.65;
-        cam.pitch = -0.45;
-        cam.radius = 28.0;
-        cam.focus = Vec3::new(0.0, gy + 5.0, 0.0);
+        cam.target_yaw = -0.65;
+        cam.target_pitch = -0.45;
+        cam.target_radius = 28.0;
+        cam.target_focus = Vec3::ZERO;
     }
 
+    // -------- Smooth damping to targets (no snapping) --------
+    // Tau values are "time-to ~63% there". Smaller = snappier.
+    let tau_rot = 0.06;
+    let tau_zoom = 0.08;
+    let tau_pan  = 0.06;
+
+    cam.yaw    = smooth_to(cam.yaw,    cam.target_yaw,    dt, tau_rot);
+    cam.pitch  = smooth_to(cam.pitch,  cam.target_pitch,  dt, tau_rot);
+    cam.radius = smooth_to(cam.radius, cam.target_radius, dt, tau_zoom).max(0.001);
+    cam.focus  = smooth_to_v(cam.focus, cam.target_focus, dt, tau_pan);
+
+    // -------- Apply to transform --------
     let (eye, up) = orbit_to_eye(cam.yaw, cam.pitch, cam.radius, cam.focus);
     t.translation = eye;
     t.look_at(cam.focus, up);
