@@ -4,10 +4,21 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-bevy = { version = "0.17", default-features = true, features = [
-  "bevy_asset","bevy_audio","bevy_pbr","bevy_sprite","bevy_text","bevy_ui","bevy_winit","png","x11"
+# --- Bevy 0.18 (from GitHub main branch) ---
+bevy = { git = "https://github.com/bevyengine/bevy", branch = "main", default-features = true, features = [
+  "bevy_asset",
+  "bevy_audio",
+  "bevy_pbr",
+  "bevy_sprite",
+  "bevy_text",
+  "bevy_ui",
+  "bevy_winit",
+  "png",
+  "x11"
 ] }
-bevy_mesh = "0.17.2"
+
+# --- Keep bevy_mesh in sync with Bevy itself ---
+bevy_mesh = { git = "https://github.com/bevyengine/bevy", branch = "main" }
 
 [profile.release]
 lto = "thin"

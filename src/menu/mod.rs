@@ -19,8 +19,8 @@ impl Plugin for MenuPlugin {
 }
 
 fn setup_menu(mut commands: Commands, assets: Res<AssetServer>) {
-    // UI camera (remove if you already spawn one elsewhere for the menu)
-    commands.spawn(Camera2d);
+    // Spawn a 2D camera (explicit transforms so nothing is missing)
+    commands.spawn((Camera2d, Transform::default(), GlobalTransform::default()));
 
     let font: Handle<Font> = assets.load("fonts/arial.ttf");
 
@@ -109,7 +109,6 @@ fn setup_menu(mut commands: Commands, assets: Res<AssetServer>) {
                             padding: UiRect::axes(Val::Px(24.0), Val::Px(14.0)),
                             ..default()
                         },
-                        // semi-transparent mustard
                         BackgroundColor(Color::srgba(0.95, 0.82, 0.10, 0.45)),
                         BorderColor::all(Color::BLACK),
                     ))
@@ -117,7 +116,6 @@ fn setup_menu(mut commands: Commands, assets: Res<AssetServer>) {
                         b.spawn((
                             Text::new("Multiplayer (coming soon)"),
                             TextFont { font, font_size: 24.0, ..default() },
-                            // dim the label too
                             TextColor(Color::srgba(0.0, 0.0, 0.0, 0.6)),
                         ));
                     });
@@ -126,7 +124,7 @@ fn setup_menu(mut commands: Commands, assets: Res<AssetServer>) {
 }
 
 fn button_logic(
-    mut next: ResMut<NextState<AppState>>,
+    mut next: ResMut<NextState<AppState>>, // <- this will EXIST now because we .init_state::<AppState>()
     mut play_vis: Query<&mut Visibility, With<PlayButton>>,
     mut panel_vis: Query<&mut Visibility, (With<ModePanel>, Without<PlayButton>)>,
     mut buttons: Query<
@@ -160,7 +158,11 @@ fn button_logic(
     }
 }
 
-fn cleanup_menu(mut commands: Commands, q: Query<Entity, With<MenuRoot>>, cams: Query<Entity, With<Camera>>) {
+fn cleanup_menu(
+    mut commands: Commands,
+    q: Query<Entity, With<MenuRoot>>,
+    cams: Query<Entity, With<Camera>>,
+) {
     for e in &q {
         commands.entity(e).despawn();
     }

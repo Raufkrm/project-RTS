@@ -1,11 +1,21 @@
+use bevy::prelude::*;
+
+// bring modules into the crate root so `crate::menu` / `crate::game` resolve
 mod app;
-mod loading; 
-mod menu;      
-mod game;      
-mod prelude;   
+mod menu;
+mod game;
 mod core;
 
+use app::AppState;
+
+
+
 fn main() {
-    let mut app = app::build_app();
-    app.run();
+    App::new()
+        .add_plugins(DefaultPlugins)
+        .init_state::<AppState>()
+        .add_plugins(menu::MenuPlugin)
+        .add_plugins(core::camera::EditorCameraPlugin) // ← add this
+        .add_plugins(game::GamePlugin)
+        .run();
 }

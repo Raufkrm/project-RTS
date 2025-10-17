@@ -1,5 +1,7 @@
+// src/game/world/sampling.rs
 use bevy::prelude::*;
 
+/// One procedural sample: height + biome parameters.
 #[derive(Clone, Copy)]
 pub struct Sample {
     pub height: f32,
@@ -7,6 +9,7 @@ pub struct Sample {
     pub humidity: f32,
 }
 
+/// Any world sampler that can produce terrain samples.
 pub trait WorldSampler: Send + Sync + 'static {
     fn sample(&self, x: f32, z: f32) -> Sample;
 
@@ -16,6 +19,7 @@ pub trait WorldSampler: Send + Sync + 'static {
     }
 }
 
+/// Simple flat-planet noise sampler (used by both terrain and planet).
 #[derive(Debug, Clone, Copy)]
 pub struct FlatSampler {
     pub seed: u64,
@@ -25,20 +29,53 @@ pub struct FlatSampler {
 
 impl WorldSampler for FlatSampler {
     fn sample(&self, x: f32, z: f32) -> Sample {
-        let n = fbm(self.seed, x * self.base_freq, z * self.base_freq);
+        // broader continents
+        let b = fbm(self.seed, x * self.base_freq, z * self.base_freq);
+        // ridged ranges
+        let r_raw = fbm(
+            self.seed ^ 0x53,
+            x * self.base_freq * 1.8,
+            z * self.base_freq * 1.8,
+        );
+        let r = 1.0 - (r_raw * 2.0 - 1.0).abs();
+        // small detail
+        let d = fbm(
+            self.seed ^ 0x91,
+            x * self.base_freq * 3.5,
+            z * self.base_freq * 3.5,
+        );
+        // combine
+        let n = (0.55 * b + 0.35 * r + 0.10 * d).clamp(0.0, 1.0);
         let h = (n - 0.5) * 2.0 * self.height_amp;
 
+        // temperature / humidity placeholders (you can keep your original)
         let t = fbm(self.seed ^ 0xA1, x * 0.00030, z * 0.00030);
         let m = fbm(self.seed ^ 0xB2, x * 0.00050, z * 0.00050);
 
-        Sample { height: h, temp: t, humidity: m }
+        Sample {
+            height: h,
+            temp: t,
+            humidity: m,
+        }
     }
 }
 
-#[derive(Resource)]
+/// Bevy resource wrapper for the sampler so systems can access it.
+#[derive(Resource, Clone)]
 pub struct FlatSamplerRes(pub FlatSampler);
 
-// ---- tiny noise
+/// Default sampler resource used at app startup.
+impl Default for FlatSamplerRes {
+    fn default() -> Self {
+        Self(FlatSampler {
+            seed: 42,         // base seed
+            base_freq: 0.003, // large-scale continent frequency
+            height_amp: 1.0,  // normalized amplitude
+        })
+    }
+}
+
+// ---------- tiny noise utilities ----------
 
 #[inline]
 fn h01(seed: u64, ix: i32, iz: i32) -> f32 {
@@ -52,9 +89,18 @@ fn h01(seed: u64, ix: i32, iz: i32) -> f32 {
     v ^= v >> 33;
     (v as u32) as f32 / (u32::MAX as f32)
 }
-#[inline] fn smooth(t: f32) -> f32 { t * t * (3.0 - 2.0 * t) }
-#[inline] fn lerp(a: f32, b: f32, t: f32) -> f32 { a + (b - a) * t }
 
+#[inline]
+fn smooth(t: f32) -> f32 {
+    t * t * (3.0 - 2.0 * t)
+}
+
+#[inline]
+fn lerp(a: f32, b: f32, t: f32) -> f32 {
+    a + (b - a) * t
+}
+
+/// Value noise at integer lattice coordinates.
 fn value(seed: u64, x: f32, z: f32) -> f32 {
     let x0 = x.floor() as i32;
     let z0 = z.floor() as i32;
@@ -69,6 +115,7 @@ fn value(seed: u64, x: f32, z: f32) -> f32 {
     lerp(lerp(v00, v10, tx), lerp(v01, v11, tx), tz)
 }
 
+/// Basic fractal Brownian motion noise.
 fn fbm(seed: u64, mut x: f32, mut z: f32) -> f32 {
     let mut amp = 1.0;
     let mut sum = 0.0;

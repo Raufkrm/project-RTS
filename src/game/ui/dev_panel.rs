@@ -1,22 +1,31 @@
+use crate::game::world::planet::{
+    spawn_random_planet_inner, PlanetParams, PlanetSettings, PlanetTag,
+};
+use crate::game::world::sampling::FlatSamplerRes;
+use crate::game::world::terrain::{MapRoot, MapSettings};
 use bevy::asset::RenderAssetUsages;
+use bevy::ecs::relationship::RelatedSpawnerCommands;
+use bevy::prelude::ChildOf;
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy::ui::widget::ImageNode;
 
-use crate::game::world::terrain::{spawn_random_map, MapRoot, MapSettings};
-
+// ----------------- Plugin -----------------
 pub struct DevPanelPlugin;
 impl Plugin for DevPanelPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<DevUiState>().add_systems(
-            Update,
-            (toggle_panel, update_fps, panel_buttons, hotkeys)
-                .run_if(in_state(crate::app::AppState::InGame)),
-        );
+        app.init_resource::<DevUiState>()
+            .init_resource::<crate::game::world::planet::PlanetParams>()
+            .init_resource::<crate::game::world::planet::PlanetSettings>()
+            .add_systems(
+                Update,
+                (toggle_panel, update_panel_texts, panel_buttons, hotkeys)
+                    .run_if(in_state(crate::app::AppState::InGame)),
+            );
     }
 }
 
-// ---------- state ----------
+// ----------------- State -----------------
 #[derive(Resource)]
 struct DevUiState {
     open: bool,
@@ -40,19 +49,148 @@ struct SeedText;
 #[derive(Component)]
 struct InfoText;
 
+// Per-setting readouts
 #[derive(Component)]
-struct DevMapRoot; // top-right container
+struct RadiusText;
+#[derive(Component)]
+struct HeightAmpText;
+#[derive(Component)]
+struct BaseFreqText;
+#[derive(Component)]
+struct DetailFreqText;
+#[derive(Component)]
+struct WarpFreqText;
+#[derive(Component)]
+struct WarpAmpText;
+#[derive(Component)]
+struct MountainsText;
+
+#[derive(Component)]
+struct DevMapRoot; // top-right preview container
 #[derive(Component)]
 struct HeightmapWidget; // image inside it
 
 #[derive(Component, Clone, Copy)]
 enum ButtonKind {
+    // map / seed / water
     Reroll,
     WaterMinus,
     WaterPlus,
+
+    // planet params
+    RadiusMinus,
+    RadiusPlus,
+    HeightMinus,
+    HeightPlus,
+
+    // planet settings
+    BaseFreqMinus,
+    BaseFreqPlus,
+    DetailFreqMinus,
+    DetailFreqPlus,
+    WarpFreqMinus,
+    WarpFreqPlus,
+    WarpAmpMinus,
+    WarpAmpPlus,
+    MountainsMinus,
+    MountainsPlus,
 }
 
-// ---------- systems ----------
+// ----------------- UI helpers -----------------
+fn row_label_value(
+    c: &mut RelatedSpawnerCommands<'_, ChildOf>,
+    font: &Handle<Font>,
+    label: &str,
+    value_comp: impl Component,
+) {
+    c.spawn((Node {
+        display: Display::Flex,
+        justify_content: JustifyContent::SpaceBetween,
+        align_items: AlignItems::Center,
+        ..default()
+    },))
+        .with_children(|r| {
+            r.spawn((
+                Text::new(label),
+                TextFont {
+                    font: font.clone(),
+                    font_size: 14.0,
+                    ..default()
+                },
+                TextColor(Color::srgb(0.85, 0.85, 0.85)),
+            ));
+            r.spawn((
+                value_comp,
+                Text::new("..."),
+                TextFont {
+                    font: font.clone(),
+                    font_size: 14.0,
+                    ..default()
+                },
+                TextColor(Color::srgb(0.9, 0.9, 0.9)),
+            ));
+        });
+}
+
+fn row_buttons(
+    c: &mut RelatedSpawnerCommands<'_, ChildOf>,
+    font: &Handle<Font>,
+    left: ButtonKind,
+    right: ButtonKind,
+) {
+    c.spawn((Node {
+        display: Display::Flex,
+        column_gap: Val::Px(6.0),
+        ..default()
+    },))
+        .with_children(|row| {
+            row.spawn((
+                left,
+                Button,
+                Node {
+                    padding: UiRect::axes(Val::Px(10.0), Val::Px(6.0)),
+                    ..default()
+                },
+                BackgroundColor(Color::srgb(0.95, 0.82, 0.10)),
+                BorderColor::all(Color::BLACK),
+            ))
+            .with_children(|b| {
+                b.spawn((
+                    Text::new("−"),
+                    TextFont {
+                        font: font.clone(),
+                        font_size: 14.0,
+                        ..default()
+                    },
+                    TextColor(Color::BLACK),
+                ));
+            });
+
+            row.spawn((
+                right,
+                Button,
+                Node {
+                    padding: UiRect::axes(Val::Px(10.0), Val::Px(6.0)),
+                    ..default()
+                },
+                BackgroundColor(Color::srgb(0.95, 0.82, 0.10)),
+                BorderColor::all(Color::BLACK),
+            ))
+            .with_children(|b| {
+                b.spawn((
+                    Text::new("+"),
+                    TextFont {
+                        font: font.clone(),
+                        font_size: 14.0,
+                        ..default()
+                    },
+                    TextColor(Color::BLACK),
+                ));
+            });
+        });
+}
+
+// ----------------- Systems -----------------
 fn toggle_panel(
     mut commands: Commands,
     keys: Res<ButtonInput<KeyCode>>,
@@ -79,7 +217,7 @@ fn toggle_panel(
                 .spawn((
                     DevPanelRoot,
                     Node {
-                        width: Val::Px(340.0),
+                        width: Val::Px(360.0),
                         height: Val::Auto,
                         display: Display::Flex,
                         flex_direction: FlexDirection::Column,
@@ -93,6 +231,7 @@ fn toggle_panel(
                     BackgroundColor(Color::srgba(0.05, 0.05, 0.06, 0.85)),
                 ))
                 .with_children(|c| {
+                    // Title + basics
                     c.spawn((
                         Text::new("DEV PANEL"),
                         TextFont {
@@ -133,7 +272,7 @@ fn toggle_panel(
                         TextColor(Color::srgb(0.8, 0.8, 0.8)),
                     ));
 
-                    // Buttons row
+                    // Buttons row (seed/water)
                     c.spawn((Node {
                         display: Display::Flex,
                         column_gap: Val::Px(8.0),
@@ -201,7 +340,7 @@ fn toggle_panel(
                                 b.spawn((
                                     Text::new("Water +"),
                                     TextFont {
-                                        font,
+                                        font: font.clone(),
                                         font_size: 14.0,
                                         ..default()
                                     },
@@ -209,6 +348,65 @@ fn toggle_panel(
                                 ));
                             });
                         });
+
+                    // ---- Planet knobs ----
+                    c.spawn((
+                        Text::new("PLANET"),
+                        TextFont {
+                            font: font.clone(),
+                            font_size: 15.0,
+                            ..default()
+                        },
+                        TextColor(Color::srgb(0.95, 0.95, 0.95)),
+                    ));
+
+                    // Radius
+                    row_label_value(c, &font, "Radius", RadiusText);
+                    row_buttons(c, &font, ButtonKind::RadiusMinus, ButtonKind::RadiusPlus);
+
+                    // Height Amp
+                    row_label_value(c, &font, "Height Amp", HeightAmpText);
+                    row_buttons(c, &font, ButtonKind::HeightMinus, ButtonKind::HeightPlus);
+
+                    // Base Freq
+                    row_label_value(c, &font, "Base Freq", BaseFreqText);
+                    row_buttons(
+                        c,
+                        &font,
+                        ButtonKind::BaseFreqMinus,
+                        ButtonKind::BaseFreqPlus,
+                    );
+
+                    // Detail Freq
+                    row_label_value(c, &font, "Detail Freq", DetailFreqText);
+                    row_buttons(
+                        c,
+                        &font,
+                        ButtonKind::DetailFreqMinus,
+                        ButtonKind::DetailFreqPlus,
+                    );
+
+                    // Warp Freq
+                    row_label_value(c, &font, "Warp Freq", WarpFreqText);
+                    row_buttons(
+                        c,
+                        &font,
+                        ButtonKind::WarpFreqMinus,
+                        ButtonKind::WarpFreqPlus,
+                    );
+
+                    // Warp Amp
+                    row_label_value(c, &font, "Warp Amp", WarpAmpText);
+                    row_buttons(c, &font, ButtonKind::WarpAmpMinus, ButtonKind::WarpAmpPlus);
+
+                    // Mountains
+                    row_label_value(c, &font, "Mountains", MountainsText);
+                    row_buttons(
+                        c,
+                        &font,
+                        ButtonKind::MountainsMinus,
+                        ButtonKind::MountainsPlus,
+                    );
                 });
         }
 
@@ -220,23 +418,40 @@ fn toggle_panel(
 
     // hide if closed
     if !ui.open {
-        if let Ok(e) = root_q.single() {
+        if let Some(e) = root_q.iter().next() {
             despawn_recursive(&mut commands, e, &children_q);
         }
-        if let Ok(e) = map_root_q.single() {
+        if let Some(e) = map_root_q.iter().next() {
             despawn_recursive(&mut commands, e, &children_q);
         }
     }
 }
 
-fn update_fps(
+use bevy::prelude::*;
+
+fn update_panel_texts(
     time: Res<Time>,
     mut ui: ResMut<DevUiState>,
-    mut fps_q: Query<&mut Text, With<FpsText>>,
     map: Res<MapSettings>,
-    mut seed_q: Query<&mut Text, (With<SeedText>, Without<FpsText>)>,
-    mut info_q: Query<&mut Text, (With<InfoText>, Without<FpsText>, Without<SeedText>)>,
+    params: Option<Res<PlanetParams>>,
+    settings: Option<Res<PlanetSettings>>,
+
+    // One query, many optional tag markers -> no B0001
+    mut texts: Query<(
+        &mut Text,
+        Option<&FpsText>,
+        Option<&SeedText>,
+        Option<&InfoText>,
+        Option<&RadiusText>,
+        Option<&HeightAmpText>,
+        Option<&BaseFreqText>,
+        Option<&DetailFreqText>,
+        Option<&WarpFreqText>,
+        Option<&WarpAmpText>,
+        Option<&MountainsText>,
+    )>,
 ) {
+    // --- FPS smoothing ---
     let dt = time.delta_secs().max(1e-6);
     let instant = 1.0 / dt;
     ui.fps_smooth = if ui.fps_smooth == 0.0 {
@@ -245,25 +460,120 @@ fn update_fps(
         ui.fps_smooth * 0.9 + instant * 0.1
     };
 
-    if let Ok(mut t) = fps_q.single_mut() {
-        t.0 = format!("FPS: {:.1}", ui.fps_smooth);
-    }
-    if let Ok(mut t) = seed_q.single_mut() {
-        t.0 = format!("Seed: {}", map.seed);
-    }
-    if let Ok(mut t) = info_q.single_mut() {
-        t.0 = format!(
-            "Size: {}×{}   Water: {:.2}",
-            map.width, map.height, map.water_level
-        );
+    // cache values we’ll write
+    let mut fps_txt: Option<String> = Some(format!("FPS: {:.1}", ui.fps_smooth));
+    let mut seed_txt: Option<String> = Some(format!("Seed: {}", map.seed));
+    let mut info_txt: Option<String> = Some(format!(
+        "Size: {}×{}   Water: {:.2}",
+        map.width, map.height, map.water_level
+    ));
+
+    let (radius_v, height_v, base_v, detail_v, wf_v, wa_v, m_v) =
+        if let (Some(p), Some(s)) = (params.as_deref(), settings.as_deref()) {
+            (
+                Some(format!("{:.2}", p.radius)),
+                Some(format!("{:.2}", p.height_amp)),
+                Some(format!("{:.2}", s.base_freq)),
+                Some(format!("{:.2}", s.detail_freq)),
+                Some(format!("{:.2}", s.warp_freq)),
+                Some(format!("{:.3}", s.warp_amp)),
+                Some(format!("{:.2}", s.mountain_strength)),
+            )
+        } else {
+            (None, None, None, None, None, None, None)
+        };
+
+    for (
+        mut text,
+        is_fps,
+        is_seed,
+        is_info,
+        is_radius,
+        is_height,
+        is_base,
+        is_detail,
+        is_wf,
+        is_wa,
+        is_m,
+    ) in &mut texts
+    {
+        if is_fps.is_some() {
+            if let Some(v) = fps_txt.take() {
+                text.0 = v;
+            }
+            continue;
+        }
+        if is_seed.is_some() {
+            if let Some(v) = seed_txt.take() {
+                text.0 = v;
+            }
+            continue;
+        }
+        if is_info.is_some() {
+            if let Some(v) = info_txt.take() {
+                text.0 = v;
+            }
+            continue;
+        }
+
+        if is_radius.is_some() {
+            if let Some(v) = &radius_v {
+                text.0 = v.clone();
+            }
+            continue;
+        }
+        if is_height.is_some() {
+            if let Some(v) = &height_v {
+                text.0 = v.clone();
+            }
+            continue;
+        }
+        if is_base.is_some() {
+            if let Some(v) = &base_v {
+                text.0 = v.clone();
+            }
+            continue;
+        }
+        if is_detail.is_some() {
+            if let Some(v) = &detail_v {
+                text.0 = v.clone();
+            }
+            continue;
+        }
+        if is_wf.is_some() {
+            if let Some(v) = &wf_v {
+                text.0 = v.clone();
+            }
+            continue;
+        }
+        if is_wa.is_some() {
+            if let Some(v) = &wa_v {
+                text.0 = v.clone();
+            }
+            continue;
+        }
+        if is_m.is_some() {
+            if let Some(v) = &m_v {
+                text.0 = v.clone();
+            }
+            continue;
+        }
     }
 }
 
+// === Buttons / rebuild ===
 fn panel_buttons(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut map: ResMut<MapSettings>,
+
+    // planet resources
+    mut sampler: ResMut<FlatSamplerRes>,
+    mut planet: ResMut<PlanetParams>,
+    mut settings: ResMut<PlanetSettings>,
+    planets: Query<Entity, With<PlanetTag>>,
+
     mut q: Query<
         (&Interaction, &mut BackgroundColor, &ButtonKind),
         (Changed<Interaction>, With<Button>),
@@ -283,17 +593,80 @@ fn panel_buttons(
             Interaction::None => *bg = BackgroundColor(Color::srgb(0.95, 0.82, 0.10)),
             Interaction::Pressed => {
                 *bg = BackgroundColor(Color::srgb(0.9, 0.8, 0.1));
-                match kind {
+                match *kind {
+                    // Seed / water
                     ButtonKind::Reroll => {
                         map.seed = map.seed.wrapping_add(1);
                         changed = true;
                     }
                     ButtonKind::WaterMinus => {
-                        map.water_level = (map.water_level - 0.02).clamp(0.05, 0.9);
+                        map.water_level = (map.water_level - 0.02).clamp(0.05, 0.95);
                         changed = true;
                     }
                     ButtonKind::WaterPlus => {
-                        map.water_level = (map.water_level + 0.02).clamp(0.05, 0.9);
+                        map.water_level = (map.water_level + 0.02).clamp(0.05, 0.95);
+                        changed = true;
+                    }
+
+                    // Params
+                    ButtonKind::RadiusMinus => {
+                        planet.radius = (planet.radius - 0.2).max(1.0);
+                        changed = true;
+                    }
+                    ButtonKind::RadiusPlus => {
+                        planet.radius = (planet.radius + 0.2).min(50.0);
+                        changed = true;
+                    }
+                    ButtonKind::HeightMinus => {
+                        planet.height_amp = (planet.height_amp - 0.05).max(0.1);
+                        changed = true;
+                    }
+                    ButtonKind::HeightPlus => {
+                        planet.height_amp = (planet.height_amp + 0.05).min(10.0);
+                        changed = true;
+                    }
+
+                    // Settings
+                    ButtonKind::BaseFreqMinus => {
+                        settings.base_freq = (settings.base_freq - 0.05).max(0.10);
+                        changed = true;
+                    }
+                    ButtonKind::BaseFreqPlus => {
+                        settings.base_freq = (settings.base_freq + 0.05).min(5.0);
+                        changed = true;
+                    }
+                    ButtonKind::DetailFreqMinus => {
+                        settings.detail_freq = (settings.detail_freq - 0.10).max(0.10);
+                        changed = true;
+                    }
+                    ButtonKind::DetailFreqPlus => {
+                        settings.detail_freq = (settings.detail_freq + 0.10).min(10.0);
+                        changed = true;
+                    }
+                    ButtonKind::WarpFreqMinus => {
+                        settings.warp_freq = (settings.warp_freq - 0.05).max(0.10);
+                        changed = true;
+                    }
+                    ButtonKind::WarpFreqPlus => {
+                        settings.warp_freq = (settings.warp_freq + 0.05).min(5.0);
+                        changed = true;
+                    }
+                    ButtonKind::WarpAmpMinus => {
+                        settings.warp_amp = (settings.warp_amp - 0.005).max(0.0);
+                        changed = true;
+                    }
+                    ButtonKind::WarpAmpPlus => {
+                        settings.warp_amp = (settings.warp_amp + 0.005).min(0.25);
+                        changed = true;
+                    }
+                    ButtonKind::MountainsMinus => {
+                        settings.mountain_strength =
+                            (settings.mountain_strength - 0.05).clamp(0.0, 1.0);
+                        changed = true;
+                    }
+                    ButtonKind::MountainsPlus => {
+                        settings.mountain_strength =
+                            (settings.mountain_strength + 0.05).clamp(0.0, 1.0);
                         changed = true;
                     }
                 }
@@ -302,14 +675,31 @@ fn panel_buttons(
     }
 
     if changed {
+        // Keep sampler & planet params in sync with the Dev Panel
+        sampler.0.seed = map.seed;
+        planet.sea_level = map.water_level;
+
+        // Despawn old planet (surface + water) and legacy map meshes if any
+        for e in &planets {
+            despawn_recursive(&mut commands, e, &children_q);
+        }
         for e in &roots {
             despawn_recursive(&mut commands, e, &children_q);
         }
-        spawn_random_map(&mut commands, &mut meshes, &mut materials, &map);
 
-        // refresh mini heightmap
-        if let Ok(root) = map_root_q.single() {
-            commands.entity(root).despawn();
+        // Spawn fresh planet
+        spawn_random_planet_inner(
+            &mut commands,
+            &mut meshes,
+            &mut materials,
+            &sampler,
+            &map,
+            &planet,
+        );
+
+        // Refresh mini heightmap
+        if let Some(root) = map_root_q.iter().next() {
+            despawn_recursive(&mut commands, root, &children_q);
         }
         spawn_heightmap_widget(&mut commands, &mut images, &map);
     }
@@ -321,6 +711,11 @@ fn hotkeys(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut map: ResMut<MapSettings>,
+    // planet resources
+    mut sampler: ResMut<FlatSamplerRes>,
+    mut planet: ResMut<PlanetParams>,
+    planets: Query<Entity, With<PlanetTag>>,
+    // legacy roots (if any)
     roots: Query<Entity, With<MapRoot>>,
     children_q: Query<&Children>,
 
@@ -329,20 +724,38 @@ fn hotkeys(
     map_root_q: Query<Entity, With<DevMapRoot>>,
 ) {
     if keys.just_pressed(KeyCode::KeyR) {
+        // seed bump + sync
         map.seed = map.seed.wrapping_add(1);
+        sampler.0.seed = map.seed;
+        planet.sea_level = map.water_level;
+
+        // remove old planet + any legacy map meshes
+        for e in &planets {
+            despawn_recursive(&mut commands, e, &children_q);
+        }
         for e in &roots {
             despawn_recursive(&mut commands, e, &children_q);
         }
-        spawn_random_map(&mut commands, &mut meshes, &mut materials, &map);
 
-        if let Ok(root) = map_root_q.single() {
-            commands.entity(root).despawn();
+        // respawn planet
+        spawn_random_planet_inner(
+            &mut commands,
+            &mut meshes,
+            &mut materials,
+            &sampler,
+            &map,
+            &planet,
+        );
+
+        // refresh mini heightmap
+        if let Some(root) = map_root_q.iter().next() {
+            despawn_recursive(&mut commands, root, &children_q);
         }
         spawn_heightmap_widget(&mut commands, &mut images, &map);
     }
 }
 
-// ---------- helpers ----------
+// ----------------- helpers -----------------
 fn despawn_recursive(commands: &mut Commands, entity: Entity, children_q: &Query<&Children>) {
     if let Ok(children) = children_q.get(entity) {
         for child in children.iter() {
@@ -353,7 +766,6 @@ fn despawn_recursive(commands: &mut Commands, entity: Entity, children_q: &Query
 }
 
 // -------- heightmap preview (matches terrain sampling) --------
-
 #[inline]
 fn hm_hash(seed: u64, x: i32, y: i32) -> u32 {
     let mut v = seed
