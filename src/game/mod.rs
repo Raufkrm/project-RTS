@@ -1,11 +1,10 @@
 use crate::app::AppState;
+
 use crate::game::world::planet::{spawn_random_planet_inner, PlanetParams};
 use crate::game::world::sampling::FlatSamplerRes;
-use crate::game::world::terrain::MapSettings;
-use bevy::prelude::*;
 
-pub mod ui;
 pub mod world;
+pub mod ui;
 
 #[derive(Component)]
 struct InGameRoot;
@@ -18,6 +17,10 @@ impl Plugin for GamePlugin {
             .init_resource::<MapSettings>()
             .init_resource::<PlanetParams>()
             .init_resource::<FlatSamplerRes>()
+            .add_systems(
+                Update,
+                (update_planet_lod, auto_clip_planes).run_if(in_state(AppState::InGame)),
+            )
             // Your dev UI etc.
             .add_plugins(ui::dev_panel::DevPanelPlugin)
             // When we enter InGame, set up the world

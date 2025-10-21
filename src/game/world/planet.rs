@@ -1,10 +1,10 @@
+use crate::core::camera::EditorCameraPlugin;
+use crate::game::world::sampling::FlatSamplerRes;
+use crate::game::world::terrain::MapSettings;
 use bevy::asset::RenderAssetUsages;
 use bevy::prelude::*;
 use bevy::render::render_resource::PrimitiveTopology;
 use bevy_mesh::{Indices, Mesh};
-
-use crate::game::world::sampling::FlatSamplerRes;
-use crate::game::world::terrain::MapSettings;
 
 // -----------------------------------------------------------------------------
 // Tags / params
@@ -25,8 +25,8 @@ pub struct PlanetParams {
 impl Default for PlanetParams {
     fn default() -> Self {
         Self {
-            radius: 6.0,
-            height_amp: 1.5,
+            radius: 500.0,
+            height_amp: 12.0,
             sea_level: 0.50,
         }
     }
@@ -60,6 +60,7 @@ pub struct PlanetSettings {
     pub rock_start: f32,
     /// Elevation (0..1 above sea) where rock fades to snow
     pub snow_start: f32,
+    pub coast_width: f32,
 }
 impl Default for PlanetSettings {
     fn default() -> Self {
@@ -68,6 +69,7 @@ impl Default for PlanetSettings {
             detail_freq: 5.0,
             warp_freq: 1.8,
             warp_amp: 0.06,
+            coast_width: 0.03,
             mountain_strength: 0.2,
             mountain_spikiness: 0.3, // spiky peaks
 
@@ -166,6 +168,7 @@ fn spawn_planet_with_settings(
 
     commands.spawn((
         PlanetTag,
+        PlanetLod { level: 4 },
         Mesh3d(handle),
         MeshMaterial3d(mat),
         Transform::default(),
@@ -173,20 +176,120 @@ fn spawn_planet_with_settings(
         Name::new("Planet"),
     ));
 }
+pub fn auto_clip_planes(
+    mut q_cam: Query<(&GlobalTransform, &mut Projection), With<Camera3d>>,
+    q_planet: Query<&GlobalTransform, With<PlanetTag>>,
+    params: Res<PlanetParams>,
+) {
+    let Ok((cam_tf, mut proj)) = q_cam.single_mut() else {
+        return;
+    };
+    let Ok(planet_tf) = q_planet.single() else {
+        return;
+    };
+
+    let center = planet_tf.translation();
+    let dist = cam_tf.translation().distance(center);
+    let alt = (dist - params.radius).max(0.1);
+
+    // Near plane small near surface, larger in orbit (prevents z-fighting)
+    let near = (alt * 0.002).clamp(0.01, 5.0);
+    // Far plane scales with planet size and altitude
+    let far = (params.radius * 6.0).max(alt * 12.0);
+
+    if let Projection::Perspective(p) = &mut *proj {
+        p.near = near;
+        p.far = far;
+    }
+}
+pub fn update_planet_lod(
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut q_planet: Query<(&mut PlanetLod, &Mesh3d, &GlobalTransform), With<PlanetTag>>,
+    q_cam: Query<&GlobalTransform, (With<Camera3d>, Without<PlanetTag>)>,
+    params: Res<PlanetParams>,
+    sampler_res: Res<FlatSamplerRes>,
+    map: Res<MapSettings>,         // ok to keep; unused is fine for now
+    settings: Res<PlanetSettings>, // <-- add this
+) {
+    // single() → single() in 0.18
+    let Ok(cam_tf) = q_cam.single() else {
+        return;
+    };
+
+    for (mut lod, mesh_h, planet_tf) in &mut q_planet {
+        let center = planet_tf.translation();
+        let dist = cam_tf.translation().distance(center).max(1.0);
+
+        let r = params.radius.max(1.0);
+        let radii = dist / r;
+
+        let target = if radii < 1.2 {
+            6
+        } else if radii < 2.0 {
+            5
+        } else if radii < 3.5 {
+            4
+        } else if radii < 5.0 {
+            3
+        } else {
+            2
+        };
+
+        if target != lod.level {
+            lod.level = target;
+
+            // mutate the mesh asset via its handle on Mesh3d
+            if let Some(mesh) = meshes.get_mut(&mesh_h.0) {
+                let new = build_colored_planet_mesh_with_subdiv(
+                    lod.level,
+                    &sampler_res,
+                    &params,
+                    &settings,
+                );
+                if let Some(positions) = new.attribute(Mesh::ATTRIBUTE_POSITION) {
+                    mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions.clone());
+                }
+                if let Some(normals) = new.attribute(Mesh::ATTRIBUTE_NORMAL) {
+                    mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals.clone());
+                }
+                if let Some(colors) = new.attribute(Mesh::ATTRIBUTE_COLOR) {
+                    mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors.clone());
+                }
+                if let Some(idx) = new.indices().cloned() {
+                    mesh.insert_indices(idx);
+                }
+            }
+        }
+    }
+}
+#[inline]
+fn smoothstep(edge0: f32, edge1: f32, x: f32) -> f32 {
+    let t = ((x - edge0) / (edge1 - edge0)).clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
+}
 
 // -----------------------------------------------------------------------------
 // Mesh generation
 // -----------------------------------------------------------------------------
-
 fn build_colored_planet_mesh(
     settings: &PlanetSettings,
     sampler_res: &FlatSamplerRes,
     params: &PlanetParams,
 ) -> Mesh {
-    // 5 is a good sweet spot; lower if you need cheaper.
-    let (mut verts, indices_u32) = generate_icosphere(7);
+    // Initial mesh detail (matches your PlanetLod { level: 4 } start)
+    build_colored_planet_mesh_with_subdiv(4, sampler_res, params, settings)
+}
 
-    // Seed is shared with your flat terrain for consistent rerolls.
+fn build_colored_planet_mesh_with_subdiv(
+    subdiv: u32,
+    sampler_res: &FlatSamplerRes,
+    params: &PlanetParams,
+    settings: &PlanetSettings,
+) -> Mesh {
+    // Build base sphere
+    let (mut verts, indices_u32) = generate_icosphere(subdiv);
+
+    // Seed shared with your flat terrain for consistent rerolls
     let seed = sampler_res.0.seed;
 
     // Pre-warm multipliers
@@ -200,7 +303,7 @@ fn build_colored_planet_mesh(
     for v in &mut verts {
         let unit = v.normalize_or_zero();
 
-        // --- seamless 3D domain-warped coords ---
+        // Subtle vector warp so continents aren’t “perfectly spherical”
         let wu = fbm3(seed ^ 0xA1, unit.x, unit.y, unit.z, warp_f);
         let wv = fbm3(seed ^ 0xB2, unit.z, unit.x, unit.y, warp_f);
         let ww = fbm3(seed ^ 0xC3, unit.y, unit.z, unit.x, warp_f);
@@ -210,96 +313,62 @@ fn build_colored_planet_mesh(
             unit.z + (ww - 0.5) * settings.warp_amp,
         );
 
-        // continents + details (seamless)
+        // Base “continent” + high-freq detail
         let continent = fbm3(seed, warped.x, warped.y, warped.z, base_f);
         let detail = fbm3(seed ^ 0xCC, warped.z, warped.x, warped.y, detail_f);
 
-        // ridged “spiky” term from detail
-        let ridge = 1.0 - ((detail * 2.0 - 1.0).abs());
-
-        // blend to n∈[0,1]
-        let mut n = (continent * 0.75 + detail * 0.25).clamp(0.0, 1.0);
-
-        // highland shaping (rough + spiky)
+        let mut n = continent * 0.72 + detail * 0.28; // 0..1
         let above = (n - params.sea_level).max(0.0);
+
+        // Add mountain gain only above sea
         if above > 0.0 {
-            let spiky = (ridge * settings.mountain_spikiness).powf(1.35); // *0.6 to tame if needed
+            let ridge = (detail - 0.5).abs() * 2.0;
+            let spiky = (ridge * settings.mountain_spikiness).powf(1.35);
             n = (n + above.powf(1.6) * (settings.mountain_strength * 0.7 + spiky * 0.6))
                 .clamp(0.0, 1.0);
         }
 
-        // --- slope estimate in 3D (for rock bias) ---
-        // tangent frame around the normal `unit`
-        let up = if unit.y.abs() < 0.99 {
-            Vec3::Y
-        } else {
-            Vec3::X
-        };
-        let t1 = unit.cross(up).normalize_or_zero();
-        let t2 = unit.cross(t1).normalize_or_zero();
+        // Elevation 0..1 normalized above sea
+        let elev01 = (n - params.sea_level).max(0.0) / (1.0 - params.sea_level).max(1e-3);
 
-        let eps = 0.015;
-        let d0 = detail;
-        let dx = fbm3(
-            seed ^ 0xCC,
-            warped.x + t1.x * eps,
-            warped.y + t1.y * eps,
-            warped.z + t1.z * eps,
-            detail_f,
-        );
-        let dy = fbm3(
-            seed ^ 0xCC,
-            warped.x + t2.x * eps,
-            warped.y + t2.y * eps,
-            warped.z + t2.z * eps,
-            detail_f,
-        );
-        let slope = ((dx - d0).abs() + (dy - d0).abs()).min(1.0);
+        // Displace radius
+        let radius = params.radius + elev01 * params.height_amp;
+        *v = unit * radius;
 
-        // world height + displace
-        let h_world = (n - params.sea_level) * params.height_amp;
-        let r = params.radius + h_world.max(0.0);
-        *v = unit * r;
-
-        // --- biome variation (subtle; seamless) ---
-        let biome = fbm3(
-            seed ^ 0x77,
-            warped.x * 3.0,
-            warped.y * 3.0,
-            warped.z * 3.0,
-            1.0,
-        );
-
-        // ----- COLORING -----
-        // normalized land elevation above sea: 0..1
-        let elev01 = (h_world / params.height_amp).clamp(0.0, 1.0);
-
-        let (r_col, g_col, b_col) = if h_world < 0.0 {
-            // water: deeper → darker
-            let d = (-h_world / params.height_amp).clamp(0.0, 1.0).powf(0.6);
-            let c = settings.water_deep.lerp(settings.water_shallow, 1.0 - d)
-                * (0.95 + 0.1 * (biome - 0.5)); // tiny variation
+        // Color
+        let (r_col, g_col, b_col) = if n < params.sea_level {
+            // Water: deep → shallow gradient
+            let depth = (params.sea_level - n) / params.sea_level.max(1e-3);
+            let k = 1.0 - smoothstep(0.0, 0.08, depth); // 0.08 keeps a very tight shoreline
+            let c = settings.water_deep.lerp(settings.water_shallow, k);
             (c.x, c.y, c.z)
         } else {
-            // beach band near sea
-            let sand_hi = 0.08;
-            let mut c = if elev01 < sand_hi {
-                let k = elev01 / sand_hi;
-                settings.land_sand.lerp(settings.land_grass, k)
-            } else {
-                // grass base with slight variation
-                settings.land_grass * (0.92 + 0.18 * (biome - 0.5))
-            };
+            // Land: sand at beaches → grass → rock → snow
+            // cheap slope hint (in noise domain)
+            let slope = {
+                let eps = 0.002;
+                let dx = fbm3(seed ^ 0x11, warped.x + eps, warped.y, warped.z, base_f)
+                    - fbm3(seed ^ 0x11, warped.x - eps, warped.y, warped.z, base_f);
+                let dy = fbm3(seed ^ 0x22, warped.x, warped.y + eps, warped.z, base_f)
+                    - fbm3(seed ^ 0x22, warped.x, warped.y - eps, warped.z, base_f);
+                (dx * dx + dy * dy).sqrt()
+            }
+            .clamp(0.0, 1.0);
 
-            // rock line (altitude OR steep slope)
+            // beach → grass blend close to sea
+
+            let beach_k = (elev01 / settings.coast_width.max(1e-3)).clamp(0.0, 1.0);
+            let mut c = settings.land_sand.lerp(settings.land_grass, beach_k);
+
+            // rock bias by height + slope
             let rock_k = ((elev01 - settings.rock_start)
                 / (settings.snow_start - settings.rock_start))
                 .clamp(0.0, 1.0);
-            let slope_bias = (slope * 2.2).clamp(0.0, 1.0); // steep → more rock
+            let slope_bias = (slope * 2.2).clamp(0.0, 1.0);
             let to_rock = rock_k.max(slope_bias);
             c = c.lerp(settings.land_rock, to_rock);
 
-            // snow line (very high → white)
+            // snow line
             if elev01 > settings.snow_start {
                 let snow_k =
                     ((elev01 - settings.snow_start) / (1.0 - settings.snow_start)).clamp(0.0, 1.0);
@@ -313,9 +382,10 @@ fn build_colored_planet_mesh(
         colors.push([r_col, g_col, b_col, 1.0]);
     }
 
-    // normals = unit vector (good enough after small displacements)
+    // Smooth normals
     let normals: Vec<[f32; 3]> = compute_smooth_normals(&verts, &indices_u32);
 
+    // Build mesh
     let mut mesh = Mesh::new(
         PrimitiveTopology::TriangleList,
         RenderAssetUsages::RENDER_WORLD,
@@ -325,6 +395,11 @@ fn build_colored_planet_mesh(
     mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
     mesh.insert_indices(Indices::U32(indices_u32));
     mesh
+}
+
+#[derive(Component, Clone, Copy)]
+pub struct PlanetLod {
+    pub level: u32, // 0..7 is sane; 6 is already heavy
 }
 
 // -----------------------------------------------------------------------------
