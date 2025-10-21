@@ -1,12 +1,12 @@
 use bevy::prelude::*;
 use std::collections::HashSet;
 
+use super::patch::{Patch, PatchGrid, PatchId};
+use super::sampling::{FlatSamplerRes, WorldSampler};
 use crate::core::camera::EditorCamera;
-use super::patch::{Patch, PatchId, PatchGrid};
-use super::sampling::{WorldSampler, FlatSamplerRes};
 
-use bevy::render::render_resource::PrimitiveTopology;
 use bevy::asset::RenderAssetUsages;
+use bevy::render::render_resource::PrimitiveTopology;
 
 #[derive(Resource, Default)]
 pub struct WantedPatches(pub HashSet<PatchId>);
@@ -16,7 +16,9 @@ pub fn compute_wanted_patches(
     cams: Query<&EditorCamera>,
     mut wanted: ResMut<WantedPatches>,
 ) {
-    let Ok(cam) = cams.single() else { return; };
+    let Ok(cam) = cams.single() else {
+        return;
+    };
     wanted.0.clear();
 
     let s = grid.patch_size_m;
@@ -25,7 +27,10 @@ pub fn compute_wanted_patches(
 
     for dy in -grid.visible_radius..=grid.visible_radius {
         for dx in -grid.visible_radius..=grid.visible_radius {
-            wanted.0.insert(PatchId { gx: gx + dx, gy: gy + dy });
+            wanted.0.insert(PatchId {
+                gx: gx + dx,
+                gy: gy + dy,
+            });
         }
     }
 }
@@ -40,11 +45,22 @@ pub fn apply_patch_streaming(
     existing: Query<(Entity, &Patch)>,
 ) {
     let mut have: HashSet<PatchId> = HashSet::new();
-    for (_, p) in &existing { have.insert(p.id); }
+    for (_, p) in &existing {
+        have.insert(p.id);
+    }
 
     for id in wanted.0.iter() {
-        if have.contains(id) { continue; }
-        spawn_one_patch(&mut commands, &mut meshes, &mut materials, *id, &grid, &sampler.0);
+        if have.contains(id) {
+            continue;
+        }
+        spawn_one_patch(
+            &mut commands,
+            &mut meshes,
+            &mut materials,
+            *id,
+            &grid,
+            &sampler.0,
+        );
     }
 
     for (e, p) in &existing {
@@ -72,7 +88,7 @@ fn spawn_one_patch(
 
     // For global color curve we’ll map heights to [-amp, +amp] where amp is the sampler’s amplitude.
     // If your sampler differs later, adjust here accordingly.
-    let global_amp =  sampler_height_amp(sampler).max(1.0);
+    let global_amp = sampler_height_amp(sampler).max(1.0);
 
     // Heights on grid
     let mut heights = vec![0.0f32; (n * n) as usize];
@@ -143,13 +159,12 @@ fn spawn_one_patch(
     let vert_count = tri_count * 3;
 
     let mut positions: Vec<[f32; 3]> = Vec::with_capacity(vert_count as usize);
-    let mut normals:   Vec<[f32; 3]> = Vec::with_capacity(vert_count as usize);
-    let mut uvs:       Vec<[f32; 2]> = Vec::with_capacity(vert_count as usize);
-    let mut colors:    Vec<[f32; 4]> = Vec::with_capacity(vert_count as usize);
+    let mut normals: Vec<[f32; 3]> = Vec::with_capacity(vert_count as usize);
+    let mut uvs: Vec<[f32; 2]> = Vec::with_capacity(vert_count as usize);
+    let mut colors: Vec<[f32; 4]> = Vec::with_capacity(vert_count as usize);
 
-    let uv = |i: u32, j: u32| -> [f32; 2] {
-        [i as f32 / (n - 1) as f32, j as f32 / (n - 1) as f32]
-    };
+    let uv =
+        |i: u32, j: u32| -> [f32; 2] { [i as f32 / (n - 1) as f32, j as f32 / (n - 1) as f32] };
     let local_pos = |i: u32, j: u32| -> (f32, f32, f32) {
         let x_local = -half + i as f32 * step;
         let z_local = -half + j as f32 * step;
@@ -203,11 +218,14 @@ fn spawn_one_patch(
         }
     }
 
-    let mut mesh = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default());
+    let mut mesh = Mesh::new(
+        PrimitiveTopology::TriangleList,
+        RenderAssetUsages::default(),
+    );
     mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
-    mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);      // ← smooth, world-space
+    mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals); // ← smooth, world-space
     mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
-    mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);        // ← global curve (no seams)
+    mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors); // ← global curve (no seams)
 
     let mesh_h = meshes.add(mesh);
     let mat_h = materials.add(StandardMaterial {

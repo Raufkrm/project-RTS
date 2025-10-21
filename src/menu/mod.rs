@@ -1,13 +1,19 @@
-use bevy::prelude::*;
 use crate::app::AppState;
+use bevy::prelude::*;
 
 // --- markers ---
-#[derive(Component)] struct MenuRoot;
-#[derive(Component)] struct PlayButton;
-#[derive(Component)] struct ModePanel;      // container that holds the two mode buttons
-#[derive(Component)] struct SingleButton;
-#[derive(Component)] struct MultiButton;
-#[derive(Component)] struct Disabled;       // simple "disabled" flag
+#[derive(Component)]
+struct MenuRoot;
+#[derive(Component)]
+struct PlayButton;
+#[derive(Component)]
+struct ModePanel; // container that holds the two mode buttons
+#[derive(Component)]
+struct SingleButton;
+#[derive(Component)]
+struct MultiButton;
+#[derive(Component)]
+struct Disabled; // simple "disabled" flag
 
 pub struct MenuPlugin;
 impl Plugin for MenuPlugin {
@@ -44,7 +50,11 @@ fn setup_menu(mut commands: Commands, assets: Res<AssetServer>) {
             // Title
             ui.spawn((
                 Text::new("PROJECT RTS"),
-                TextFont { font: font.clone(), font_size: 56.0, ..default() },
+                TextFont {
+                    font: font.clone(),
+                    font_size: 56.0,
+                    ..default()
+                },
                 TextColor(Color::WHITE),
             ));
 
@@ -62,7 +72,11 @@ fn setup_menu(mut commands: Commands, assets: Res<AssetServer>) {
             .with_children(|b| {
                 b.spawn((
                     Text::new("Play"),
-                    TextFont { font: font.clone(), font_size: 26.0, ..default() },
+                    TextFont {
+                        font: font.clone(),
+                        font_size: 26.0,
+                        ..default()
+                    },
                     TextColor(Color::BLACK),
                 ));
             });
@@ -94,7 +108,11 @@ fn setup_menu(mut commands: Commands, assets: Res<AssetServer>) {
                     .with_children(|b| {
                         b.spawn((
                             Text::new("Singleplayer"),
-                            TextFont { font: font.clone(), font_size: 24.0, ..default() },
+                            TextFont {
+                                font: font.clone(),
+                                font_size: 24.0,
+                                ..default()
+                            },
                             TextColor(Color::BLACK),
                         ));
                     });
@@ -115,7 +133,11 @@ fn setup_menu(mut commands: Commands, assets: Res<AssetServer>) {
                     .with_children(|b| {
                         b.spawn((
                             Text::new("Multiplayer (coming soon)"),
-                            TextFont { font, font_size: 24.0, ..default() },
+                            TextFont {
+                                font,
+                                font_size: 24.0,
+                                ..default()
+                            },
                             TextColor(Color::srgba(0.0, 0.0, 0.0, 0.6)),
                         ));
                     });
@@ -128,25 +150,37 @@ fn button_logic(
     mut play_vis: Query<&mut Visibility, With<PlayButton>>,
     mut panel_vis: Query<&mut Visibility, (With<ModePanel>, Without<PlayButton>)>,
     mut buttons: Query<
-        (&Interaction, &mut BackgroundColor, Option<&Disabled>, Option<&SingleButton>, Entity),
-        (Changed<Interaction>, With<Button>)
+        (
+            &Interaction,
+            &mut BackgroundColor,
+            Option<&Disabled>,
+            Option<&SingleButton>,
+            Entity,
+        ),
+        (Changed<Interaction>, With<Button>),
     >,
 ) {
     for (interaction, mut bg, disabled, is_single, entity) in &mut buttons {
         // hover tint for enabled buttons
         match (*interaction, disabled.is_some()) {
             (Interaction::Hovered, false) => *bg = BackgroundColor(Color::srgb(1.0, 0.9, 0.2)),
-            (Interaction::None,    false) => *bg = BackgroundColor(Color::srgb(0.95, 0.82, 0.10)),
+            (Interaction::None, false) => *bg = BackgroundColor(Color::srgb(0.95, 0.82, 0.10)),
             _ => {}
         }
 
         if *interaction == Interaction::Pressed {
-            if disabled.is_some() { continue; } // ignore disabled
+            if disabled.is_some() {
+                continue;
+            } // ignore disabled
 
             // Play button → reveal panel, hide Play
             if play_vis.get_mut(entity).is_ok() {
-                if let Ok(mut v_panel) = panel_vis.single_mut() { *v_panel = Visibility::Visible; }
-                if let Ok(mut v_play)  = play_vis.single_mut()  { *v_play  = Visibility::Hidden;  }
+                if let Ok(mut v_panel) = panel_vis.single_mut() {
+                    *v_panel = Visibility::Visible;
+                }
+                if let Ok(mut v_play) = play_vis.single_mut() {
+                    *v_play = Visibility::Hidden;
+                }
                 continue;
             }
 

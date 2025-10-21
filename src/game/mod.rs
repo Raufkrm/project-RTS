@@ -1,11 +1,11 @@
-use bevy::prelude::*;
 use crate::app::AppState;
 use crate::game::world::planet::{spawn_random_planet_inner, PlanetParams};
-use crate::game::world::terrain::MapSettings;
 use crate::game::world::sampling::FlatSamplerRes;
+use crate::game::world::terrain::MapSettings;
+use bevy::prelude::*;
 
-pub mod world;
 pub mod ui;
+pub mod world;
 
 #[derive(Component)]
 struct InGameRoot;
