@@ -4,8 +4,8 @@ use bevy::window::PrimaryWindow;
 use std::f32::consts::PI;
 
 use crate::app::AppState;
+use crate::core::galaxy_camera::MainCamera;
 use crate::core::planet_camera::{ScaleFovByAltitude, ScaledWheelZoom};
-use crate::core::unified_planet_camera::{MainCamera, PlanetCamera};
 use crate::game::world::planet::PlanetParams;
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -167,6 +167,10 @@ pub struct GameCamera {
 
 // keep older code working that still refers to `EditorCamera`
 pub use GameCamera as EditorCamera;
+
+/// Legacy marker to keep compatibility with older systems that expect a `PlanetCamera` component.
+#[derive(Component, Default)]
+pub struct PlanetCamera;
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Lifecycle

@@ -1,0 +1,4 @@
+pub struct PlanetSurfaceParams {
+    #[uniform(13)]
+    pub params: PlanetSurfaceUniform,
+}

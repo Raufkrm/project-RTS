@@ -7,7 +7,7 @@ use bevy::prelude::*;
 use bevy::reflect::TypePath;
 use bevy::render::alpha::AlphaMode;
 use bevy::render::render_resource::{AsBindGroup, PrimitiveTopology, ShaderType};
-use bevy::shader::ShaderRef; // ← correct place for your Bevy version
+use bevy::shader::ShaderRef; // ΓåÉ correct place for your Bevy version
 use bevy_mesh::{Indices, Mesh, VertexAttributeValues};
 use bevy::pbr::MaterialPlugin;
 
@@ -25,7 +25,7 @@ pub struct CloudLayer;
 #[derive(Asset, AsBindGroup, TypePath, Clone)]
 pub struct PlanetSurfaceParams {
     // ExtendedMaterial ALWAYS binds the extension uniform at @group(2) @binding(0)
-    #[uniform(0)]
+    #[uniform(31)]
     pub params: PlanetSurfaceUniform,
 }
 
@@ -827,7 +827,7 @@ impl Default for PlanetDebugConfig {
 }
 
 // -----------------------------------------------------------------------------
-// Plugin – registers resources (so they’re available in Phase 2 UI)
+// Plugin ΓÇô registers resources (so theyΓÇÖre available in Phase 2 UI)
 // -----------------------------------------------------------------------------
 pub struct PlanetPlugin;
 impl Plugin for PlanetPlugin {
@@ -1078,7 +1078,7 @@ pub fn update_planet_lod(
     settings: Res<PlanetSettings>, // <-- add this
     debug: Res<PlanetDebugConfig>,
 ) {
-    // single() → single() in 0.18
+    // single() ΓåÆ single() in 0.18
     let Ok(cam_tf) = q_cam.single() else {
         return;
     };

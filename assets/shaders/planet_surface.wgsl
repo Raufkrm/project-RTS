@@ -39,7 +39,7 @@ struct PlanetSurfaceUniform {
     land_snow: vec4<f32>,
 };
 
-@group(2) @binding(0)
+@group(3) @binding(31)
 var<uniform> material: PlanetSurfaceUniform;
 
 fn smooth3(t: f32) -> f32 {

@@ -15,23 +15,22 @@ use crate::game::world::planet::{
     PlanetSurfaceParams, // <-- add
 };
 use crate::game::world::sampling::FlatSamplerRes;
-<<<<<<< HEAD
 use crate::game::world::terrain::MapSettings;
-use bevy::log::info;
-use bevy::math::primitives::Sphere;
-use bevy::pbr::{wireframe::WireframePlugin, MaterialPlugin};
-use bevy::prelude::*;
-use bevy::render::render_resource::AsBindGroup;
-use bevy::render::renderer::RenderDevice; // <-- add
-use bevy::render::{Render, RenderApp, RenderSystems};
+use bevy::{
+    math::{primitives::Sphere, EulerRot, Quat, Vec3},
+    pbr::{wireframe::WireframePlugin, MaterialPlugin, StandardMaterial},
+    prelude::*,
+    render::{
+        render_resource::AsBindGroup,
+        renderer::RenderDevice,
+        Render,
+        RenderApp,
+        RenderSystems,
+    },
+};
 
-pub mod ui;
-pub mod world;
-=======
-
 pub mod world;
 pub mod ui;
->>>>>>> 7e6f9f8ca734934589b0e887862f7c5feb852eed
 
 #[derive(Component)]
 pub struct InGameRoot;
@@ -80,12 +79,18 @@ impl Plugin for GamePlugin {
 }
 
 fn inspect_planet_material_layout(render_device: Res<RenderDevice>) {
-    let entries =
-        <PlanetSurfaceParams as AsBindGroup>::bind_group_layout_entries(&render_device, false)
+    let base_entries =
+        <StandardMaterial as AsBindGroup>::bind_group_layout_entries(&render_device, false)
             .into_iter()
             .map(|e| (e.binding, e.visibility, e.ty))
             .collect::<Vec<_>>();
-    info!("PlanetSurfaceMaterial bindings: {:?}", entries);
+    let extended_entries =
+        <PlanetSurfaceMaterial as AsBindGroup>::bind_group_layout_entries(&render_device, false)
+            .into_iter()
+            .map(|e| (e.binding, e.visibility, e.ty))
+            .collect::<Vec<_>>();
+    info!("StandardMaterial bindings: {:?}", base_entries);
+    info!("PlanetSurfaceMaterial bindings: {:?}", extended_entries);
 }
 
 fn setup_world(

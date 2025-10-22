@@ -3,14 +3,8 @@ use std::collections::HashSet;
 
 use super::patch::{Patch, PatchGrid, PatchId};
 use super::sampling::{FlatSamplerRes, WorldSampler};
-<<<<<<< HEAD
-
-use crate::core::galaxy_camera::{CameraMode, GalaxyCamera};
-use crate::game::world::planet::PlanetTag;
-=======
 use crate::core::camera::EditorCamera;
 
->>>>>>> 7e6f9f8ca734934589b0e887862f7c5feb852eed
 use bevy::asset::RenderAssetUsages;
 use bevy::render::render_resource::PrimitiveTopology;
 
@@ -19,12 +13,7 @@ pub struct WantedPatches(pub HashSet<PatchId>);
 
 pub fn compute_wanted_patches(
     grid: Res<PatchGrid>,
-<<<<<<< HEAD
-    cams: Query<&GalaxyCamera>,
-    planets: Query<&GlobalTransform, With<PlanetTag>>,
-=======
     cams: Query<&EditorCamera>,
->>>>>>> 7e6f9f8ca734934589b0e887862f7c5feb852eed
     mut wanted: ResMut<WantedPatches>,
 ) {
     let Ok(cam) = cams.single() else {
@@ -32,29 +21,9 @@ pub fn compute_wanted_patches(
     };
     wanted.0.clear();
 
-<<<<<<< HEAD
-    let focus = match cam.mode {
-        CameraMode::Free => cam.free.focus,
-        CameraMode::Orbit => {
-            if let Some(orbit) = cam.orbit {
-                planets
-                    .get(orbit.target)
-                    .map(|tf| tf.translation())
-                    .unwrap_or(cam.free.focus)
-            } else {
-                cam.free.focus
-            }
-        }
-    };
-
-    let s = grid.patch_size_m;
-    let gx = (focus.x / s).floor() as i32;
-    let gy = (focus.z / s).floor() as i32;
-=======
     let s = grid.patch_size_m;
     let gx = (cam.focus.x / s).floor() as i32;
     let gy = (cam.focus.z / s).floor() as i32;
->>>>>>> 7e6f9f8ca734934589b0e887862f7c5feb852eed
 
     for dy in -grid.visible_radius..=grid.visible_radius {
         for dx in -grid.visible_radius..=grid.visible_radius {
@@ -278,11 +247,7 @@ fn spawn_one_patch(
 }
 
 #[inline]
-<<<<<<< HEAD
-fn sampler_height_amp(_sampler: &impl WorldSampler) -> f32 {
-=======
 fn sampler_height_amp(sampler: &impl WorldSampler) -> f32 {
->>>>>>> 7e6f9f8ca734934589b0e887862f7c5feb852eed
     // Our current sampler is FlatSampler { height_amp, .. }.
     // If you swap to a different sampler later, adjust this accessor.
     // Try downcasting via Any to fetch a reasonable default:
