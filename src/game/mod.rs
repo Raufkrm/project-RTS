@@ -15,6 +15,7 @@ use crate::game::world::planet::{
     PlanetSurfaceParams, // <-- add
 };
 use crate::game::world::sampling::FlatSamplerRes;
+<<<<<<< HEAD
 use crate::game::world::terrain::MapSettings;
 use bevy::log::info;
 use bevy::math::primitives::Sphere;
@@ -26,6 +27,11 @@ use bevy::render::{Render, RenderApp, RenderSystems};
 
 pub mod ui;
 pub mod world;
+=======
+
+pub mod world;
+pub mod ui;
+>>>>>>> 7e6f9f8ca734934589b0e887862f7c5feb852eed
 
 #[derive(Component)]
 pub struct InGameRoot;
