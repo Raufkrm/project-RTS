@@ -1,10 +1,15 @@
 use bevy::prelude::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct PatchId { pub gx: i32, pub gy: i32 }
+pub struct PatchId {
+    pub gx: i32,
+    pub gy: i32,
+}
 
 #[derive(Component)]
-pub struct Patch { pub id: PatchId }
+pub struct Patch {
+    pub id: PatchId,
+}
 
 #[derive(Resource)]
 pub struct PatchGrid {
@@ -17,7 +22,7 @@ impl Default for PatchGrid {
     fn default() -> Self {
         Self {
             patch_size_m: 256.0,
-            visible_radius: 4,  // ← was 3
+            visible_radius: 4, // ← was 3
             verts_per_side: 64,
         }
     }

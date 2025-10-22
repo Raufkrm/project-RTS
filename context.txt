@@ -1,0 +1,95 @@
+Exactly — that’s the perfect mental image.
+
+What Manor Lords does on a small, regional scale (a single settlement zooming from tactical → strategic → cinematic → first-person), you want to do on an astronomical scale, using ECS to keep it performant.
+
+Let’s break the concept down from the technical and design side:
+
+🌌 1. The Core Vision
+
+Scale: A continuous zoom range from galactic overview → planet orbit → surface map → first-person level.
+
+Center: Always a star (no playable surface). Each planet orbits it in real time.
+
+Continuity: No hard transitions or loading screens — just LOD swaps and precision shifts.
+
+Gameplay layer: RTS overview at galactic/planetary scale; immersive management or exploration when zoomed in.
+
+🧠 2. Why ECS fits perfectly
+
+ECS lets you:
+
+Stream entities per context (galaxy → solar → planet → city) without losing systemic consistency.
+
+Swap render and simulation detail dynamically.
+
+Far entities = simplified data (position, orbit, population count)
+
+Near entities = full simulation (buildings, units, terrain, physics)
+
+Parallelize updates massively (necessary for millions of entities).
+
+Each level of zoom would use a different ECS “view”:
+
+// pseudo
+struct GalaxyView;
+struct PlanetView;
+struct SurfaceView;
+struct FirstPersonView;
+
+
+Only one active at a time, with smooth interpolation between camera positions.
+
+🪐 3. The Seamless Zoom Concept
+
+Inspired by Manor Lords, but extended to cosmic scale.
+
+Zoom Level	What You See	Simulation Detail	Example LOD
+Galaxy	Stars, orbits	Only orbital mechanics	Billboards & glow shaders
+Solar System	Planets, moons, asteroid belts	Simple rotation, atmospheric effects	3D spheres w/ dynamic textures
+Planet Orbit	Terrain shell, weather, clouds	Active region streaming	Medium LOD terrain mesh
+Surface	Cities, trees, units	Full simulation	Terrain chunks streamed via quadtree
+First-Person	Buildings, people	Local physics, animations	Full fidelity
+🧭 4. Precision Handling
+
+Floating-point precision breaks down across huge distances.
+→ Solution: hierarchical coordinate frames:
+
+Local origin for each planet
+
+Transform parent (solar → galactic) using double precision or relative positioning
+
+Re-anchor camera when transitioning (similar to Kerbal Space Program’s PQS system)
+
+🎥 5. The Camera System
+
+You’ll need:
+
+Smooth interpolation of FOV, position, and near/far planes
+(e.g. exponential zoom function over multiple magnitudes)
+
+Dynamic pivot point: at galactic zoom = solar system center; at surface zoom = terrain focus.
+
+LOD-aware transition system (blend skybox → orbit sphere → terrain mesh).
+
+In Bevy 0.17+:
+
+Use a single camera entity with a ZoomLevel component.
+
+Systems control FOV, translation speed, and precision scaling per level.
+
+Switch rendering pipelines (skybox vs terrain shader) dynamically.
+
+🔭 6. Design Goal
+
+You’re not just simulating a planet.
+You’re simulating an entire civilization ecosystem — each level of zoom just changes how the player interacts with the same data.
+
+E.g.:
+
+In space view: move fleets, colonize planets.
+
+In orbit: manage planetary logistics.
+
+On surface: manage local economy or city layout.
+
+In first-person: walk among your citizens.

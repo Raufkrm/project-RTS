@@ -1,0 +1,1013 @@
+2025-10-22T15:45:04.909344Z TRACE wgpu_core::device::global: BindGroup::drop Id(17,496)
+2025-10-22T15:45:04.909465Z TRACE wgpu_core::device::global: Device::create_bind_group -> Id(35,6)
+2025-10-22T15:45:04.909473Z TRACE wgpu_core::device::global: Device::create_bind_group -> Id(7,7)
+2025-10-22T15:45:04.909484Z TRACE wgpu_core::device::global: Device::create_bind_group -> Id(67,5)
+2025-10-22T15:45:04.909504Z TRACE wgpu_core::device::global: Device::create_bind_group -> Id(71,5)
+2025-10-22T15:45:04.909518Z TRACE wgpu_core::device::global: Device::create_bind_group -> Id(55,7)
+2025-10-22T15:45:04.909522Z TRACE wgpu_core::device::global: Device::create_bind_group -> Id(63,6)
+2025-10-22T15:45:04.909544Z TRACE wgpu_core::device::global: Device::create_bind_group -> Id(17,497)
+2025-10-22T15:45:04.909548Z TRACE wgpu_core::device::global: Device::create_bind_group -> Id(13,494)
+2025-10-22T15:45:04.909662Z TRACE wgpu_core::device::global: BindGroup::drop Id(27,6)
+2025-10-22T15:45:04.909853Z TRACE wgpu_core::device::global: Device::create_bind_group -> Id(69,5)
+2025-10-22T15:45:04.909860Z TRACE wgpu_core::device::global: BindGroup::drop Id(3,489)
+2025-10-22T15:45:04.909988Z TRACE wgpu_core::device::global: Device::create_bind_group -> Id(31,7)
+2025-10-22T15:45:04.910051Z TRACE wgpu_core::device::global: Device::create_bind_group -> Id(34,6)
+2025-10-22T15:45:04.910247Z TRACE wgpu_core::device::global: Device::create_bind_group -> Id(3,490)
+2025-10-22T15:45:04.910133Z TRACE wgpu_core::device::global: Device::create_bind_group -> Id(22,6)
+2025-10-22T15:45:04.910075Z TRACE wgpu_core::device::global: Device::create_bind_group -> Id(27,7)
+2025-10-22T15:45:04.910269Z TRACE wgpu_core::device::global: Device::create_bind_group -> Id(49,6)
+2025-10-22T15:45:04.910296Z TRACE wgpu_core::device::global: Device::create_bind_group -> Id(72,6)
+2025-10-22T15:45:04.910459Z TRACE wgpu_core::device::global: Device::create_bind_group -> Id(56,6)
+2025-10-22T15:45:04.910474Z TRACE wgpu_core::device::global: BindGroup::drop Id(26,6)
+2025-10-22T15:45:04.910624Z TRACE wgpu_core::device::global: Device::create_bind_group -> Id(40,6)
+2025-10-22T15:45:04.910632Z TRACE wgpu_core::device::queue: Queue::write_buffer
+2025-10-22T15:45:04.910744Z TRACE wgpu_core::device::global: Device::create_bind_group -> Id(70,5)
+2025-10-22T15:45:04.910756Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'prepass_view_motion_vectors_bind_group' label
+2025-10-22T15:45:04.910883Z TRACE wgpu_core::device::global: Device::create_bind_group -> Id(26,7)
+2025-10-22T15:45:04.910922Z TRACE wgpu_core::device::queue: Queue::write_buffer
+2025-10-22T15:45:04.910975Z TRACE wgpu_core::device::global: Device::create_bind_group -> Id(2,493)
+2025-10-22T15:45:04.911133Z TRACE wgpu_core::device::global: Device::create_bind_group -> Id(23,6)
+2025-10-22T15:45:04.911235Z TRACE wgpu_core::device::global: Device::create_bind_group -> Id(44,6)
+2025-10-22T15:45:04.911243Z TRACE wgpu_core::device::global: Device::create_bind_group -> Id(73,5)
+2025-10-22T15:45:04.911308Z TRACE wgpu_core::device::global: Device::create_bind_group -> Id(52,7)
+2025-10-22T15:45:04.911362Z TRACE wgpu_core::device::global: Device::create_bind_group -> Id(5,472)
+2025-10-22T15:45:04.911377Z TRACE wgpu_core::device::global: BindGroup::drop Id(4,501)
+2025-10-22T15:45:04.911480Z TRACE wgpu_core::device::global: Device::create_bind_group -> Id(66,5)
+2025-10-22T15:45:04.911500Z TRACE wgpu_core::device::global: Device::create_bind_group -> Id(38,7)
+2025-10-22T15:45:04.911516Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'ui_texture_slice_view_bind_group' label
+2025-10-22T15:45:04.911616Z TRACE wgpu_core::device::global: Device::create_bind_group -> Id(4,502)
+2025-10-22T15:45:04.911734Z TRACE wgpu_core::device::global: Device::create_bind_group -> Id(28,6)
+2025-10-22T15:45:04.911741Z TRACE wgpu_core::device::global: Device::create_bind_group -> Id(30,6)
+2025-10-22T15:45:04.911810Z TRACE wgpu_core::device::global: BindGroup::drop Id(59,6)
+2025-10-22T15:45:04.911906Z TRACE wgpu_core::device::global: Device::create_bind_group -> Id(53,6)
+2025-10-22T15:45:04.911918Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'gradient_view_bind_group' label
+2025-10-22T15:45:04.912013Z TRACE wgpu_core::device::global: Device::create_bind_group -> Id(59,7)
+2025-10-22T15:45:04.912093Z TRACE wgpu_core::device::global: Device::create_bind_group -> Id(29,6)
+2025-10-22T15:45:04.912157Z TRACE wgpu_core::device::global: BindGroup::drop Id(11,478)
+2025-10-22T15:45:04.912212Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'box_shadow_view_bind_group' label
+2025-10-22T15:45:04.912350Z TRACE wgpu_core::device::global: BindGroup::drop Id(68,5)
+2025-10-22T15:45:04.912411Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'mesh2d_view_bind_group' label
+2025-10-22T15:45:04.912522Z TRACE wgpu_core::device::global: BindGroup::drop Id(58,5)
+2025-10-22T15:45:04.912575Z TRACE wgpu_core::device::global: BindGroup::drop Id(20,24)
+2025-10-22T15:45:04.912626Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'skinned_motion_mesh_bind_group' label
+2025-10-22T15:45:04.912684Z TRACE wgpu_core::device::global: BindGroup::drop Id(24,7)
+2025-10-22T15:45:04.912734Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'skinned_mesh_bind_group' label
+2025-10-22T15:45:04.912801Z TRACE wgpu_core::device::global: BindGroup::drop Id(6,484)
+2025-10-22T15:45:04.912852Z TRACE wgpu_core::device::global: BindGroup::drop Id(39,5)
+2025-10-22T15:45:04.912902Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'skinned_motion_mesh_bind_group' label
+2025-10-22T15:45:04.912956Z TRACE wgpu_core::device::global: BindGroup::drop Id(19,498)
+2025-10-22T15:45:04.913007Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'skinned_mesh_bind_group' label
+2025-10-22T15:45:04.913062Z TRACE wgpu_core::device::global: BindGroup::drop Id(65,5)
+2025-10-22T15:45:04.913118Z TRACE wgpu_core::device::global: BindGroup::drop Id(48,5)
+2025-10-22T15:45:04.913167Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'skinned_motion_mesh_bind_group' label
+2025-10-22T15:45:04.913220Z TRACE wgpu_core::device::global: BindGroup::drop Id(45,5)
+2025-10-22T15:45:04.913294Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'skinned_mesh_bind_group' label
+2025-10-22T15:45:04.913404Z TRACE wgpu_core::device::global: BindGroup::drop Id(74,5)
+2025-10-22T15:45:04.913481Z TRACE wgpu_core::device::global: BindGroup::drop Id(16,472)
+2025-10-22T15:45:04.913552Z TRACE wgpu_core::device::global: BindGroup::drop Id(64,5)
+2025-10-22T15:45:04.913652Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'mesh_view_bind_group_empty' label
+2025-10-22T15:45:04.913788Z TRACE wgpu_core::device::global: BindGroup::drop Id(32,6)
+2025-10-22T15:45:04.913867Z TRACE wgpu_core::device::global: BindGroup::drop Id(50,5)
+2025-10-22T15:45:04.913932Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'oit_resolve_bind_group' label
+2025-10-22T15:45:04.914039Z TRACE wgpu_core::device::global: BindGroup::drop Id(57,5)
+2025-10-22T15:45:04.914104Z TRACE wgpu_core::device::global: BindGroup::drop Id(62,5)
+2025-10-22T15:45:04.914202Z TRACE wgpu_core::device::global: BindGroup::drop Id(46,5)
+2025-10-22T15:45:04.914265Z TRACE wgpu_core::device::global: BindGroup::drop Id(42,7)
+2025-10-22T15:45:04.914615Z TRACE wgpu_core::device::global: BindGroup::drop Id(18,485)
+2025-10-22T15:45:04.914701Z TRACE wgpu_core::device::global: BindGroup::drop Id(54,5)
+2025-10-22T15:45:04.914792Z TRACE wgpu_core::device::global: BindGroup::drop Id(61,5)
+2025-10-22T15:45:04.914857Z TRACE wgpu_core::device::global: BindGroup::drop Id(51,5)
+2025-10-22T15:45:04.914918Z TRACE wgpu_core::device::global: BindGroup::drop Id(43,5)
+2025-10-22T15:45:04.914985Z TRACE wgpu_core::device::global: BindGroup::drop Id(41,5)
+2025-10-22T15:45:04.915048Z TRACE wgpu_core::device::global: BindGroup::drop Id(47,6)
+2025-10-22T15:45:04.915104Z TRACE wgpu_core::device::global: BindGroup::drop Id(60,6)
+2025-10-22T15:45:04.915399Z TRACE wgpu_core::device::global: ComputePipeline::drop Id(3,1)
+2025-10-22T15:45:04.915492Z TRACE wgpu_core::pipeline: Destroy raw ComputePipeline with 'ssao_preprocess_depth_pipeline' label
+2025-10-22T15:45:04.915622Z TRACE wgpu_core::device::global: ComputePipeline::drop Id(1,1)
+2025-10-22T15:45:04.915689Z TRACE wgpu_core::pipeline: Destroy raw ComputePipeline with 'ssao_spatial_denoise_pipeline' label
+2025-10-22T15:45:04.915794Z TRACE wgpu_core::device::global: ComputePipeline::drop Id(7,1)
+2025-10-22T15:45:04.915860Z TRACE wgpu_core::pipeline: Destroy raw ComputePipeline with 'transmittance_lut_pipeline' label
+2025-10-22T15:45:04.915940Z TRACE wgpu_core::device::global: ComputePipeline::drop Id(20,1)
+2025-10-22T15:45:04.916011Z TRACE wgpu_core::pipeline: Destroy raw ComputePipeline with 'multi_scattering_lut_pipeline' label
+2025-10-22T15:45:04.916111Z TRACE wgpu_core::device::global: ComputePipeline::drop Id(13,1)
+2025-10-22T15:45:04.916185Z TRACE wgpu_core::pipeline: Destroy raw ComputePipeline with 'sky_view_lut_pipeline' label
+2025-10-22T15:45:04.916272Z TRACE wgpu_core::device::global: ComputePipeline::drop Id(21,1)
+2025-10-22T15:45:04.916347Z TRACE wgpu_core::pipeline: Destroy raw ComputePipeline with 'aerial_view_lut_pipeline' label
+2025-10-22T15:45:04.916451Z TRACE wgpu_core::device::global: RenderPipeline::drop Id(2,1)
+2025-10-22T15:45:04.916521Z TRACE wgpu_core::pipeline: Destroy raw RenderPipeline with 'copy_deferred_lighting_id_pipeline' label
+2025-10-22T15:45:04.916623Z TRACE wgpu_core::device::global: ComputePipeline::drop Id(23,1)
+2025-10-22T15:45:04.916707Z TRACE wgpu_core::pipeline: Destroy raw ComputePipeline with 'downsampling_first_pipeline' label
+2025-10-22T15:45:04.916807Z TRACE wgpu_core::device::global: ComputePipeline::drop Id(25,1)
+2025-10-22T15:45:04.916878Z TRACE wgpu_core::pipeline: Destroy raw ComputePipeline with 'downsampling_second_pipeline' label
+2025-10-22T15:45:04.916959Z TRACE wgpu_core::device::global: ComputePipeline::drop Id(24,1)
+2025-10-22T15:45:04.917020Z TRACE wgpu_core::pipeline: Destroy raw ComputePipeline with 'radiance_pipeline' label
+2025-10-22T15:45:04.917091Z TRACE wgpu_core::device::global: ComputePipeline::drop Id(26,1)
+2025-10-22T15:45:04.917145Z TRACE wgpu_core::pipeline: Destroy raw ComputePipeline with 'irradiance_pipeline' label
+2025-10-22T15:45:04.917217Z TRACE wgpu_core::device::global: ComputePipeline::drop Id(28,1)
+2025-10-22T15:45:04.917276Z TRACE wgpu_core::pipeline: Destroy raw ComputePipeline with 'copy_pipeline' label
+2025-10-22T15:45:04.917367Z TRACE wgpu_core::device::global: ComputePipeline::drop Id(27,1)
+2025-10-22T15:45:04.917440Z TRACE wgpu_core::pipeline: Destroy raw ComputePipeline with 'environment_pipeline' label
+2025-10-22T15:45:04.917539Z TRACE wgpu_core::device::global: RenderPipeline::drop Id(4,1)
+2025-10-22T15:45:04.917605Z TRACE wgpu_core::pipeline: Destroy raw RenderPipeline with 'sprite_pipeline' label
+2025-10-22T15:45:04.917678Z TRACE wgpu_core::device::global: RenderPipeline::drop Id(0,1)
+2025-10-22T15:45:04.917734Z TRACE wgpu_core::device::global: RenderPipeline::drop Id(3,1)
+2025-10-22T15:45:04.917784Z TRACE wgpu_core::pipeline: Destroy raw RenderPipeline with 'tonemapping pipeline' label
+2025-10-22T15:45:04.917847Z TRACE wgpu_core::device::global: ComputePipeline::drop Id(16,1)
+2025-10-22T15:45:04.917907Z TRACE wgpu_core::pipeline: Destroy raw ComputePipeline with 'mesh preprocessing (direct)' label
+2025-10-22T15:45:04.917972Z TRACE wgpu_core::device::global: ComputePipeline::drop Id(8,1)
+2025-10-22T15:45:04.918027Z TRACE wgpu_core::device::global: ComputePipeline::drop Id(18,1)
+2025-10-22T15:45:04.918079Z TRACE wgpu_core::pipeline: Destroy raw ComputePipeline with 'mesh preprocessing (early GPU occlusion culling)' label
+2025-10-22T15:45:04.918145Z TRACE wgpu_core::device::global: ComputePipeline::drop Id(5,1)
+2025-10-22T15:45:04.918196Z TRACE wgpu_core::pipeline: Destroy raw ComputePipeline with 'mesh preprocessing (late GPU occlusion culling)' label
+2025-10-22T15:45:04.918259Z TRACE wgpu_core::device::global: ComputePipeline::drop Id(19,1)
+2025-10-22T15:45:04.918311Z TRACE wgpu_core::pipeline: Destroy raw ComputePipeline with 'frustum culling build indexed indirect parameters' label
+2025-10-22T15:45:04.918368Z TRACE wgpu_core::device::global: ComputePipeline::drop Id(4,1)
+2025-10-22T15:45:04.918420Z TRACE wgpu_core::pipeline: Destroy raw ComputePipeline with 'frustum culling build non-indexed indirect parameters' label
+2025-10-22T15:45:04.918476Z TRACE wgpu_core::device::global: ComputePipeline::drop Id(15,1)
+2025-10-22T15:45:04.918539Z TRACE wgpu_core::device::global: ComputePipeline::drop Id(22,1)
+2025-10-22T15:45:04.918599Z TRACE wgpu_core::device::global: ComputePipeline::drop Id(17,1)
+2025-10-22T15:45:04.918651Z TRACE wgpu_core::pipeline: Destroy raw ComputePipeline with 'early occlusion culling build non-indexed indirect parameters' label
+2025-10-22T15:45:04.918714Z TRACE wgpu_core::device::global: ComputePipeline::drop Id(9,1)
+2025-10-22T15:45:04.918778Z TRACE wgpu_core::pipeline: Destroy raw ComputePipeline with 'late occlusion culling build indexed indirect parameters' label
+2025-10-22T15:45:04.918872Z TRACE wgpu_core::device::global: ComputePipeline::drop Id(12,1)
+2025-10-22T15:45:04.918943Z TRACE wgpu_core::pipeline: Destroy raw ComputePipeline with 'late occlusion culling build non-indexed indirect parameters' label
+2025-10-22T15:45:04.919036Z TRACE wgpu_core::device::global: ComputePipeline::drop Id(14,1)
+2025-10-22T15:45:04.919115Z TRACE wgpu_core::device::global: ComputePipeline::drop Id(11,1)
+2025-10-22T15:45:04.919185Z TRACE wgpu_core::pipeline: Destroy raw ComputePipeline with 'main occlusion culling build non-indexed indirect parameters' label
+2025-10-22T15:45:04.919268Z TRACE wgpu_core::device::global: ComputePipeline::drop Id(2,1)
+2025-10-22T15:45:04.919335Z TRACE wgpu_core::pipeline: Destroy raw ComputePipeline with 'downsample depth first phase pipeline' label
+2025-10-22T15:45:04.919412Z TRACE wgpu_core::device::global: ComputePipeline::drop Id(6,1)
+2025-10-22T15:45:04.919470Z TRACE wgpu_core::pipeline: Destroy raw ComputePipeline with 'downsample depth second phase pipeline' label
+2025-10-22T15:45:04.919534Z TRACE wgpu_core::device::global: ComputePipeline::drop Id(0,1)
+2025-10-22T15:45:04.919592Z TRACE wgpu_core::pipeline: Destroy raw ComputePipeline with 'downsample depth multisample first phase pipeline' label
+2025-10-22T15:45:04.919663Z TRACE wgpu_core::device::global: ComputePipeline::drop Id(10,1)
+2025-10-22T15:45:04.919717Z TRACE wgpu_core::pipeline: Destroy raw ComputePipeline with 'downsample depth multisample second phase pipeline' label
+2025-10-22T15:45:04.919781Z TRACE wgpu_core::device::global: RenderPipeline::drop Id(1,1)
+2025-10-22T15:45:04.919846Z TRACE wgpu_core::device::global: RenderPipeline::drop Id(7,1)
+2025-10-22T15:45:04.919914Z TRACE wgpu_core::device::global: RenderPipeline::drop Id(6,1)
+2025-10-22T15:45:04.920006Z TRACE wgpu_core::device::global: RenderPipeline::drop Id(8,1)
+2025-10-22T15:45:04.920068Z TRACE wgpu_core::device::global: RenderPipeline::drop Id(5,1)
+2025-10-22T15:45:04.920123Z TRACE wgpu_core::pipeline: Destroy raw RenderPipeline with 'tonemapping pipeline' label
+2025-10-22T15:45:04.920195Z TRACE wgpu_core::device::global: RenderPipeline::drop Id(9,1)
+2025-10-22T15:45:04.920250Z TRACE wgpu_core::device::global: RenderPipeline::drop Id(10,1)
+Encountered a panic in system `Enable the debug feature to see the name`!
+2025-10-22T15:45:04.920624Z TRACE wgpu_core::device::global: Device::create_command_encoder -> Id(7,11)
+2025-10-22T15:45:04.920970Z TRACE wgpu_core::command::clear: CommandEncoder::clear_buffer Id(37,1)
+2025-10-22T15:45:04.921059Z TRACE wgpu_core::command::clear: CommandEncoder::clear_buffer Id(76,1)
+2025-10-22T15:45:04.921119Z TRACE wgpu_core::command::clear: CommandEncoder::clear_buffer Id(44,1)
+2025-10-22T15:45:04.921477Z TRACE wgpu_core::device::global: Device::create_command_encoder -> Id(0,790)
+2025-10-22T15:45:04.921992Z TRACE wgpu_core::device::global: Device::create_command_encoder -> Id(4,11)
+2025-10-22T15:45:04.922854Z TRACE wgpu_core::device::global: Device::create_command_encoder -> Id(3,791)
+2025-10-22T15:45:04.922860Z TRACE wgpu_core::device::global: Device::create_command_encoder -> Id(6,11)
+2025-10-22T15:45:04.922895Z TRACE wgpu_core::device::global: Device::create_command_encoder -> Id(1,790)
+2025-10-22T15:45:04.922934Z TRACE wgpu_core::device::global: Device::create_command_encoder -> Id(5,11)
+2025-10-22T15:45:04.922939Z TRACE wgpu_core::device::global: Device::create_command_encoder -> Id(2,790)
+2025-10-22T15:45:04.923347Z TRACE wgpu_core::device::queue: Queue::submit
+2025-10-22T15:45:04.923733Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:04.923821Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:04.923884Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:04.923934Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:04.923983Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:04.924031Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:04.924079Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:04.924168Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:04.924220Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:04.924270Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:04.924332Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:04.924419Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:04.924495Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:04.924586Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:04.924667Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:04.924752Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:04.924809Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:04.924867Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:04.924935Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:04.925018Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:04.925076Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:04.925164Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:04.925234Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:04.925299Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:04.925360Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:04.925419Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:04.925501Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:04.925566Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:04.925631Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:04.925699Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:04.925754Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:04.925804Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:04.925854Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:04.925950Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'preprocess_gpu_indexed_frustum_culling_bind_group' label
+2025-10-22T15:45:04.926044Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'preprocess_gpu_indexed_frustum_culling_bind_group' label
+2025-10-22T15:45:04.926109Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'preprocess_gpu_indexed_frustum_culling_bind_group' label
+2025-10-22T15:45:04.926168Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'preprocess_gpu_indexed_frustum_culling_bind_group' label
+2025-10-22T15:45:04.926226Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'preprocess_gpu_indexed_frustum_culling_bind_group' label
+2025-10-22T15:45:04.926281Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'preprocess_gpu_indexed_frustum_culling_bind_group' label
+2025-10-22T15:45:04.926337Z TRACE wgpu_core::pipeline: Destroy raw ComputePipeline with 'mesh preprocessing (GPU frustum culling)' label
+2025-10-22T15:45:04.926429Z TRACE wgpu_core::pipeline: Destroy raw ComputePipeline with 'early occlusion culling build indexed indirect parameters' label
+2025-10-22T15:45:04.926525Z TRACE wgpu_core::resource: Destroy raw TextureView with 'directional_light_shadow_map_array_texture_view' label
+2025-10-22T15:45:04.926621Z TRACE wgpu_core::resource: Destroy raw TextureView with 'directional_light_shadow_map_array_texture_view' label
+2025-10-22T15:45:04.926704Z TRACE wgpu_core::resource: Destroy raw TextureView with 'directional_light_shadow_map_array_texture_view' label
+2025-10-22T15:45:04.926772Z TRACE wgpu_core::resource: Destroy raw TextureView with 'directional_light_shadow_map_array_texture_view' label
+2025-10-22T15:45:04.926850Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'prepass_view_no_motion_vectors_bind_group' label
+2025-10-22T15:45:04.926933Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'model_only_mesh_bind_group' label
+2025-10-22T15:45:04.927008Z TRACE wgpu_core::pipeline: Destroy raw RenderPipeline with 'pbr_prepass_pipeline' label
+2025-10-22T15:45:04.927315Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'reset_indexed_indirect_batch_sets_bind_group' label
+2025-10-22T15:45:04.927409Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'build_indexed_indirect_parameters_bind_group' label
+2025-10-22T15:45:04.927504Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'reset_indexed_indirect_batch_sets_bind_group' label
+2025-10-22T15:45:04.927575Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'build_indexed_indirect_parameters_bind_group' label
+2025-10-22T15:45:04.927663Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'reset_indexed_indirect_batch_sets_bind_group' label
+2025-10-22T15:45:04.927761Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'build_indexed_indirect_parameters_bind_group' label
+2025-10-22T15:45:04.927836Z TRACE wgpu_core::pipeline: Destroy raw ComputePipeline with 'reset indirect batch sets' label
+2025-10-22T15:45:04.927922Z TRACE wgpu_core::pipeline: Destroy raw ComputePipeline with 'main occlusion culling build indexed indirect parameters' label
+2025-10-22T15:45:04.928031Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'model_only_mesh_bind_group' label
+2025-10-22T15:45:04.928098Z TRACE wgpu_core::pipeline: Destroy raw RenderPipeline with 'pbr_opaque_mesh_pipeline' label
+2025-10-22T15:45:04.928158Z TRACE wgpu_core::pipeline: Destroy raw RenderPipeline with 'pbr_opaque_mesh_pipeline' label
+2025-10-22T15:45:04.928244Z TRACE wgpu_core::resource: Destroy raw Buffer with 'LineGizmo Strip Color Buffer' label
+2025-10-22T15:45:04.928304Z TRACE wgpu_core::resource: Destroy raw Buffer with 'LineGizmo Strip Position Buffer' label
+2025-10-22T15:45:04.928360Z TRACE wgpu_core::resource: Destroy raw TextureView with '' label
+2025-10-22T15:45:04.928422Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'mesh_view_bind_group' label
+2025-10-22T15:45:04.928493Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:04.928546Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:04.928599Z TRACE wgpu_core::resource: Destroy raw TextureView with 'point_light_shadow_map_array_texture_view' label
+2025-10-22T15:45:04.928653Z TRACE wgpu_core::resource: Destroy raw TextureView with 'directional_light_shadow_map_array_texture_view' label
+2025-10-22T15:45:04.928708Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'mesh_view_bind_group_binding_array' label
+2025-10-22T15:45:04.928764Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'model_only_mesh_bind_group' label
+2025-10-22T15:45:04.928820Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'LineGizmoUniform bindgroup' label
+2025-10-22T15:45:04.928880Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'ui_view_bind_group' label
+2025-10-22T15:45:04.928936Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'ui_material_bind_group' label
+2025-10-22T15:45:04.928990Z TRACE wgpu_core::resource: Destroy raw TextureView with '' label
+2025-10-22T15:45:04.929048Z TRACE wgpu_core::resource: Destroy raw Texture with '' label
+2025-10-22T15:45:04.929106Z TRACE wgpu_core::pipeline: Destroy raw RenderPipeline with 'pbr_alpha_blend_mesh_pipeline' label
+2025-10-22T15:45:04.929178Z TRACE wgpu_core::pipeline: Destroy raw RenderPipeline with 'LineGizmo 3d Pipeline' label
+2025-10-22T15:45:04.929243Z TRACE wgpu_core::pipeline: Destroy raw RenderPipeline with 'ui_pipeline' label
+2025-10-22T15:45:04.929316Z TRACE wgpu_core::pipeline: Destroy raw RenderPipeline with 'blit pipeline' label
+2025-10-22T15:45:04.929401Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:04.929496Z TRACE wgpu_core::device::queue: Queue::submit returned submit index 791
+2025-10-22T15:45:04.929695Z TRACE wgpu_core::device::global: CommandBuffer::drop Id(7,11)
+2025-10-22T15:45:04.929784Z TRACE wgpu_core::device::global: CommandEncoder::drop Id(7,11)
+2025-10-22T15:45:04.929859Z TRACE wgpu_core::command: Drop CommandBuffer with '' label
+2025-10-22T15:45:04.929925Z TRACE wgpu_core::device::global: CommandBuffer::drop Id(6,11)
+2025-10-22T15:45:04.929998Z TRACE wgpu_core::device::global: CommandEncoder::drop Id(6,11)
+2025-10-22T15:45:04.930077Z TRACE wgpu_core::command: Drop CommandBuffer with 'shadow_pass_command_encoder' label
+2025-10-22T15:45:04.930158Z TRACE wgpu_core::device::global: CommandBuffer::drop Id(1,790)
+2025-10-22T15:45:04.930227Z TRACE wgpu_core::device::global: CommandEncoder::drop Id(1,790)
+2025-10-22T15:45:04.930325Z TRACE wgpu_core::command: Drop CommandBuffer with 'shadow_pass_command_encoder' label
+2025-10-22T15:45:04.930399Z TRACE wgpu_core::device::global: CommandBuffer::drop Id(2,790)
+2025-10-22T15:45:04.930482Z TRACE wgpu_core::device::global: CommandEncoder::drop Id(2,790)
+2025-10-22T15:45:04.930551Z TRACE wgpu_core::command: Drop CommandBuffer with 'shadow_pass_command_encoder' label
+2025-10-22T15:45:04.930609Z TRACE wgpu_core::device::global: CommandBuffer::drop Id(3,791)
+2025-10-22T15:45:04.930659Z TRACE wgpu_core::device::global: CommandEncoder::drop Id(3,791)
+2025-10-22T15:45:04.930727Z TRACE wgpu_core::command: Drop CommandBuffer with 'shadow_pass_command_encoder' label
+2025-10-22T15:45:04.930873Z TRACE wgpu_core::device::global: CommandBuffer::drop Id(0,790)
+2025-10-22T15:45:04.930945Z TRACE wgpu_core::device::global: CommandEncoder::drop Id(0,790)
+2025-10-22T15:45:04.931005Z TRACE wgpu_core::command: Drop CommandBuffer with '' label
+2025-10-22T15:45:04.931056Z TRACE wgpu_core::device::global: CommandBuffer::drop Id(5,11)
+2025-10-22T15:45:04.931104Z TRACE wgpu_core::device::global: CommandEncoder::drop Id(5,11)
+2025-10-22T15:45:04.931154Z TRACE wgpu_core::command: Drop CommandBuffer with 'main_opaque_pass_3d_command_encoder' label
+2025-10-22T15:45:04.931205Z TRACE wgpu_core::device::global: CommandBuffer::drop Id(4,11)
+2025-10-22T15:45:04.931253Z TRACE wgpu_core::device::global: CommandEncoder::drop Id(4,11)
+2025-10-22T15:45:04.931307Z TRACE wgpu_core::command: Drop CommandBuffer with '' label
+2025-10-22T15:45:04.933374Z TRACE wgpu_core::device::global: BindGroup::drop Id(17,497)
+2025-10-22T15:45:04.933479Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'preprocess_gpu_indexed_frustum_culling_bind_group' label
+2025-10-22T15:45:04.933577Z TRACE wgpu_core::device::global: BindGroup::drop Id(31,7)
+2025-10-22T15:45:04.933649Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'preprocess_gpu_indexed_frustum_culling_bind_group' label
+2025-10-22T15:45:04.933740Z TRACE wgpu_core::device::global: BindGroup::drop Id(49,6)
+2025-10-22T15:45:04.933817Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'preprocess_gpu_indexed_frustum_culling_bind_group' label
+2025-10-22T15:45:04.933882Z TRACE wgpu_core::device::global: BindGroup::drop Id(40,6)
+2025-10-22T15:45:04.933936Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'preprocess_gpu_indexed_frustum_culling_bind_group' label
+2025-10-22T15:45:04.934016Z TRACE wgpu_core::device::global: TextureView::drop Id(42,6)
+2025-10-22T15:45:04.934090Z TRACE wgpu_core::device::global: TextureView::drop Id(41,6)
+2025-10-22T15:45:04.934147Z TRACE wgpu_core::device::global: TextureView::drop Id(40,6)
+2025-10-22T15:45:04.934203Z TRACE wgpu_core::device::global: TextureView::drop Id(39,6)
+2025-10-22T15:45:04.934297Z TRACE wgpu_core::device::global: BindGroup::drop Id(71,5)
+2025-10-22T15:45:04.934352Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'mesh2d_view_bind_group' label
+2025-10-22T15:45:04.934421Z TRACE wgpu_core::device::global: BindGroup::drop Id(23,6)
+2025-10-22T15:45:04.934484Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'preprocess_gpu_indexed_frustum_culling_bind_group' label
+2025-10-22T15:45:04.934571Z TRACE wgpu_core::device::global: BindGroup::drop Id(26,7)
+2025-10-22T15:45:04.934633Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'preprocess_gpu_indexed_frustum_culling_bind_group' label
+2025-10-22T15:45:04.934702Z TRACE wgpu_core::device::global: BindGroup::drop Id(13,494)
+2025-10-22T15:45:04.934762Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'mesh_view_bind_group' label
+2025-10-22T15:45:04.934827Z TRACE wgpu_core::device::global: BindGroup::drop Id(34,6)
+2025-10-22T15:45:04.934888Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'mesh_view_bind_group_binding_array' label
+2025-10-22T15:45:04.934964Z TRACE wgpu_core::device::global: BindGroup::drop Id(72,6)
+2025-10-22T15:45:04.935019Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'mesh_view_bind_group_empty' label
+2025-10-22T15:45:04.935090Z TRACE wgpu_core::device::global: TextureView::drop Id(26,790)
+2025-10-22T15:45:04.935155Z TRACE wgpu_core::resource: Destroy raw TextureView with 'point_light_shadow_map_array_texture_view' label
+2025-10-22T15:45:04.935235Z TRACE wgpu_core::device::global: TextureView::drop Id(38,6)
+2025-10-22T15:45:04.935296Z TRACE wgpu_core::resource: Destroy raw TextureView with 'directional_light_shadow_map_array_texture_view' label
+2025-10-22T15:45:04.935370Z TRACE wgpu_core::device::global: Buffer::drop Id(73,6)
+2025-10-22T15:45:04.935444Z TRACE wgpu_core::device::global: Buffer::drop Id(72,6)
+2025-10-22T15:45:04.936239Z TRACE wgpu_core::device::global: BindGroup::drop Id(14,1)
+2025-10-22T15:45:04.936317Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with '' label
+2025-10-22T15:45:04.936447Z TRACE wgpu_core::device::global: BindGroup::drop Id(15,473)
+2025-10-22T15:45:04.936502Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with '' label
+2025-10-22T15:45:04.936687Z TRACE wgpu_core::instance: Surface::drop Id(0,1)
+2025-10-22T15:45:04.946409Z TRACE wgpu_core::device::global: Buffer::drop Id(16,1)
+2025-10-22T15:45:04.946552Z TRACE wgpu_core::device::global: Buffer::drop Id(15,1)
+2025-10-22T15:45:04.946671Z TRACE wgpu_core::device::global: TextureView::drop Id(13,1)
+2025-10-22T15:45:04.946748Z TRACE wgpu_core::resource: Destroy raw TextureView with '' label
+2025-10-22T15:45:04.946831Z TRACE wgpu_core::device::global: Texture::drop Id(13,1)
+2025-10-22T15:45:04.946904Z TRACE wgpu_core::resource: Destroy raw Texture with '' label
+2025-10-22T15:45:04.947004Z TRACE wgpu_core::device::global: Sampler::drop Id(27,1)
+2025-10-22T15:45:04.947095Z TRACE wgpu_core::resource: Destroy raw Sampler with 'Tonemapping LUT sampler' label
+2025-10-22T15:45:04.947177Z TRACE wgpu_core::device::global: TextureView::drop Id(18,1)
+2025-10-22T15:45:04.947248Z TRACE wgpu_core::resource: Destroy raw TextureView with '' label
+2025-10-22T15:45:04.947331Z TRACE wgpu_core::device::global: Texture::drop Id(18,1)
+2025-10-22T15:45:04.947403Z TRACE wgpu_core::resource: Destroy raw Texture with '' label
+2025-10-22T15:45:04.947985Z TRACE wgpu_core::device::global: TextureView::drop Id(20,1)
+2025-10-22T15:45:04.948040Z TRACE wgpu_core::device::global: Texture::drop Id(20,1)
+2025-10-22T15:45:04.948097Z TRACE wgpu_core::device::global: TextureView::drop Id(31,1)
+2025-10-22T15:45:04.948148Z TRACE wgpu_core::device::global: Texture::drop Id(31,1)
+2025-10-22T15:45:04.948199Z TRACE wgpu_core::device::global: TextureView::drop Id(23,1)
+2025-10-22T15:45:04.948250Z TRACE wgpu_core::resource: Destroy raw TextureView with '' label
+2025-10-22T15:45:04.948302Z TRACE wgpu_core::device::global: Texture::drop Id(23,1)
+2025-10-22T15:45:04.948351Z TRACE wgpu_core::resource: Destroy raw Texture with '' label
+2025-10-22T15:45:04.948406Z TRACE wgpu_core::device::global: Sampler::drop Id(29,1)
+2025-10-22T15:45:04.948457Z TRACE wgpu_core::resource: Destroy raw Sampler with 'Tonemapping LUT sampler' label
+2025-10-22T15:45:04.948512Z TRACE wgpu_core::device::global: TextureView::drop Id(25,1)
+2025-10-22T15:45:04.948584Z TRACE wgpu_core::device::global: Texture::drop Id(25,1)
+2025-10-22T15:45:04.948659Z TRACE wgpu_core::device::global: TextureView::drop Id(32,7)
+2025-10-22T15:45:04.948737Z TRACE wgpu_core::device::global: Texture::drop Id(32,5)
+2025-10-22T15:45:04.948812Z TRACE wgpu_core::device::global: TextureView::drop Id(34,1)
+2025-10-22T15:45:04.948875Z TRACE wgpu_core::device::global: Texture::drop Id(34,1)
+2025-10-22T15:45:04.948935Z TRACE wgpu_core::device::global: TextureView::drop Id(14,1)
+2025-10-22T15:45:04.948992Z TRACE wgpu_core::resource: Destroy raw TextureView with '' label
+2025-10-22T15:45:04.949069Z TRACE wgpu_core::device::global: Texture::drop Id(14,1)
+2025-10-22T15:45:04.949136Z TRACE wgpu_core::resource: Destroy raw Texture with '' label
+2025-10-22T15:45:04.949203Z TRACE wgpu_core::device::global: TextureView::drop Id(15,1)
+2025-10-22T15:45:04.949293Z TRACE wgpu_core::resource: Destroy raw TextureView with '' label
+2025-10-22T15:45:04.949366Z TRACE wgpu_core::device::global: Texture::drop Id(15,1)
+2025-10-22T15:45:04.949442Z TRACE wgpu_core::resource: Destroy raw Texture with '' label
+2025-10-22T15:45:04.949527Z TRACE wgpu_core::device::global: TextureView::drop Id(16,1)
+2025-10-22T15:45:04.949600Z TRACE wgpu_core::resource: Destroy raw TextureView with '' label
+2025-10-22T15:45:04.949682Z TRACE wgpu_core::device::global: Texture::drop Id(16,1)
+2025-10-22T15:45:04.949753Z TRACE wgpu_core::resource: Destroy raw Texture with '' label
+2025-10-22T15:45:04.949838Z TRACE wgpu_core::device::global: Sampler::drop Id(28,1)
+2025-10-22T15:45:04.949920Z TRACE wgpu_core::resource: Destroy raw Sampler with 'Tonemapping LUT sampler' label
+2025-10-22T15:45:04.950009Z TRACE wgpu_core::device::global: TextureView::drop Id(19,1)
+2025-10-22T15:45:04.950082Z TRACE wgpu_core::device::global: Texture::drop Id(19,1)
+2025-10-22T15:45:04.950157Z TRACE wgpu_core::device::global: TextureView::drop Id(21,1)
+2025-10-22T15:45:04.950247Z TRACE wgpu_core::device::global: Texture::drop Id(21,1)
+2025-10-22T15:45:04.950313Z TRACE wgpu_core::device::global: TextureView::drop Id(33,1)
+2025-10-22T15:45:04.950368Z TRACE wgpu_core::device::global: Texture::drop Id(33,1)
+2025-10-22T15:45:04.950423Z TRACE wgpu_core::device::global: TextureView::drop Id(22,1)
+2025-10-22T15:45:04.950471Z TRACE wgpu_core::resource: Destroy raw TextureView with '' label
+2025-10-22T15:45:04.950526Z TRACE wgpu_core::device::global: Texture::drop Id(22,1)
+2025-10-22T15:45:04.950573Z TRACE wgpu_core::resource: Destroy raw Texture with '' label
+2025-10-22T15:45:04.950630Z TRACE wgpu_core::device::global: TextureView::drop Id(24,1)
+2025-10-22T15:45:04.950679Z TRACE wgpu_core::resource: Destroy raw TextureView with '' label
+2025-10-22T15:45:04.950728Z TRACE wgpu_core::device::global: Texture::drop Id(24,1)
+2025-10-22T15:45:04.950777Z TRACE wgpu_core::resource: Destroy raw Texture with '' label
+2025-10-22T15:45:04.950843Z TRACE wgpu_core::device::global: TextureView::drop Id(28,1)
+2025-10-22T15:45:04.950894Z TRACE wgpu_core::resource: Destroy raw TextureView with '' label
+2025-10-22T15:45:04.950944Z TRACE wgpu_core::device::global: Texture::drop Id(28,1)
+2025-10-22T15:45:04.950994Z TRACE wgpu_core::resource: Destroy raw Texture with 'main_texture_b' label
+2025-10-22T15:45:04.951049Z TRACE wgpu_core::device::global: TextureView::drop Id(29,1)
+2025-10-22T15:45:04.951110Z TRACE wgpu_core::device::global: Texture::drop Id(29,1)
+2025-10-22T15:45:04.951173Z TRACE wgpu_core::device::global: TextureView::drop Id(27,1)
+2025-10-22T15:45:04.951228Z TRACE wgpu_core::device::global: Texture::drop Id(27,1)
+2025-10-22T15:45:04.951278Z TRACE wgpu_core::device::global: TextureView::drop Id(37,1)
+2025-10-22T15:45:04.951327Z TRACE wgpu_core::resource: Destroy raw TextureView with '' label
+2025-10-22T15:45:04.951381Z TRACE wgpu_core::device::global: Texture::drop Id(36,1)
+2025-10-22T15:45:04.951430Z TRACE wgpu_core::device::global: TextureView::drop Id(35,1)
+2025-10-22T15:45:04.951482Z TRACE wgpu_core::resource: Destroy raw TextureView with '' label
+2025-10-22T15:45:04.951533Z TRACE wgpu_core::device::global: Texture::drop Id(35,1)
+2025-10-22T15:45:04.951592Z TRACE wgpu_core::resource: Destroy raw Texture with 'point_light_shadow_map_texture' label
+2025-10-22T15:45:04.952082Z TRACE wgpu_core::device::global: TextureView::drop Id(30,1)
+2025-10-22T15:45:04.952149Z TRACE wgpu_core::device::global: Texture::drop Id(30,1)
+2025-10-22T15:45:04.952209Z TRACE wgpu_core::device::global: Buffer::drop Id(12,2)
+2025-10-22T15:45:04.952270Z TRACE wgpu_core::device::global: Buffer::drop Id(10,2)
+2025-10-22T15:45:04.952333Z TRACE wgpu_core::device::global: Buffer::drop Id(37,1)
+2025-10-22T15:45:04.952386Z TRACE wgpu_core::device::global: Buffer::drop Id(39,1)
+2025-10-22T15:45:04.952438Z TRACE wgpu_core::device::global: Buffer::drop Id(52,2)
+2025-10-22T15:45:04.952491Z TRACE wgpu_core::device::global: Buffer::drop Id(51,2)
+2025-10-22T15:45:04.952567Z TRACE wgpu_core::device::global: Buffer::drop Id(76,1)
+2025-10-22T15:45:04.952649Z TRACE wgpu_core::device::global: Buffer::drop Id(77,1)
+2025-10-22T15:45:04.952716Z TRACE wgpu_core::device::global: Buffer::drop Id(41,1)
+2025-10-22T15:45:04.952767Z TRACE wgpu_core::device::global: Buffer::drop Id(43,1)
+2025-10-22T15:45:04.952817Z TRACE wgpu_core::device::global: Buffer::drop Id(44,1)
+2025-10-22T15:45:04.952866Z TRACE wgpu_core::device::global: Buffer::drop Id(45,1)
+2025-10-22T15:45:04.952991Z TRACE wgpu_core::device::global: Buffer::drop Id(30,1)
+2025-10-22T15:45:04.953171Z TRACE wgpu_core::device::global: Buffer::drop Id(5,1)
+2025-10-22T15:45:04.953238Z TRACE wgpu_core::device::global: BindGroup::drop Id(1,1)
+2025-10-22T15:45:04.953291Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'ColorMaterial' label
+2025-10-22T15:45:04.953374Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:04.953462Z TRACE wgpu_core::device::global: Buffer::drop Id(18,1)
+2025-10-22T15:45:04.953519Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:04.953584Z TRACE wgpu_core::device::global: BindGroup::drop Id(37,1)
+2025-10-22T15:45:04.953635Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'ui_material_bind_group' label
+2025-10-22T15:45:04.953693Z TRACE wgpu_core::resource: Destroy raw TextureView with '' label
+2025-10-22T15:45:04.953751Z TRACE wgpu_core::resource: Destroy raw Texture with '' label
+2025-10-22T15:45:04.953808Z TRACE wgpu_core::device::global: BindGroup::drop Id(9,1)
+2025-10-22T15:45:04.953861Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'ui_material_bind_group' label
+2025-10-22T15:45:04.953916Z TRACE wgpu_core::resource: Destroy raw TextureView with '' label
+2025-10-22T15:45:04.953968Z TRACE wgpu_core::resource: Destroy raw Texture with '' label
+2025-10-22T15:45:04.954043Z TRACE wgpu_core::device::global: BindGroup::drop Id(12,449)
+2025-10-22T15:45:04.954133Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'ui_material_bind_group' label
+2025-10-22T15:45:04.954206Z TRACE wgpu_core::resource: Destroy raw TextureView with '' label
+2025-10-22T15:45:04.954280Z TRACE wgpu_core::resource: Destroy raw Texture with '' label
+2025-10-22T15:45:04.954354Z TRACE wgpu_core::device::global: BindGroup::drop Id(25,1)
+2025-10-22T15:45:04.954407Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'ui_material_bind_group' label
+2025-10-22T15:45:04.954470Z TRACE wgpu_core::resource: Destroy raw TextureView with '' label
+2025-10-22T15:45:04.954550Z TRACE wgpu_core::resource: Destroy raw Texture with '' label
+2025-10-22T15:45:04.954618Z TRACE wgpu_core::device::global: BindGroup::drop Id(33,1)
+2025-10-22T15:45:04.954674Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'ui_material_bind_group' label
+2025-10-22T15:45:04.954733Z TRACE wgpu_core::resource: Destroy raw TextureView with '' label
+2025-10-22T15:45:04.954903Z TRACE wgpu_core::resource: Destroy raw Texture with '' label
+2025-10-22T15:45:04.954989Z TRACE wgpu_core::device::global: BindGroup::drop Id(10,1)
+2025-10-22T15:45:04.955049Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'ui_material_bind_group' label
+2025-10-22T15:45:04.955129Z TRACE wgpu_core::resource: Destroy raw TextureView with '' label
+2025-10-22T15:45:04.955201Z TRACE wgpu_core::resource: Destroy raw Texture with '' label
+2025-10-22T15:45:04.955266Z TRACE wgpu_core::device::global: BindGroup::drop Id(8,1)
+2025-10-22T15:45:04.955332Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'ui_material_bind_group' label
+2025-10-22T15:45:04.955429Z TRACE wgpu_core::resource: Destroy raw TextureView with '' label
+2025-10-22T15:45:04.955505Z TRACE wgpu_core::resource: Destroy raw Texture with '' label
+2025-10-22T15:45:04.955576Z TRACE wgpu_core::device::global: BindGroup::drop Id(3,490)
+2025-10-22T15:45:04.955648Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'ui_material_bind_group' label
+2025-10-22T15:45:04.955726Z TRACE wgpu_core::resource: Destroy raw TextureView with '' label
+2025-10-22T15:45:04.955819Z TRACE wgpu_core::device::global: Buffer::drop Id(20,2)
+2025-10-22T15:45:04.955879Z TRACE wgpu_core::device::global: Buffer::drop Id(23,2)
+2025-10-22T15:45:04.955938Z TRACE wgpu_core::device::global: BindGroup::drop Id(63,6)
+2025-10-22T15:45:04.955991Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'ui_view_bind_group' label
+2025-10-22T15:45:04.956076Z TRACE wgpu_core::device::global: BindGroup::drop Id(73,5)
+2025-10-22T15:45:04.956128Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'ui_texture_slice_view_bind_group' label
+2025-10-22T15:45:04.956188Z TRACE wgpu_core::device::global: BindGroup::drop Id(28,6)
+2025-10-22T15:45:04.956239Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'gradient_view_bind_group' label
+2025-10-22T15:45:04.956296Z TRACE wgpu_core::device::global: BindGroup::drop Id(29,6)
+2025-10-22T15:45:04.956346Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'box_shadow_view_bind_group' label
+2025-10-22T15:45:04.956404Z TRACE wgpu_core::device::global: Buffer::drop Id(68,1)
+2025-10-22T15:45:04.956454Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:04.956518Z TRACE wgpu_core::device::global: Buffer::drop Id(70,1)
+2025-10-22T15:45:04.956569Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:04.956626Z TRACE wgpu_core::device::global: Buffer::drop Id(65,1)
+2025-10-22T15:45:04.956718Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:04.956788Z TRACE wgpu_core::device::global: Buffer::drop Id(67,1)
+2025-10-22T15:45:04.956842Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:04.956896Z TRACE wgpu_core::device::global: Buffer::drop Id(69,1)
+2025-10-22T15:45:04.956949Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:04.957007Z TRACE wgpu_core::device::global: Buffer::drop Id(71,1)
+2025-10-22T15:45:04.957063Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:04.957183Z TRACE wgpu_core::device::global: Buffer::drop Id(58,1)
+2025-10-22T15:45:04.957252Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:04.957336Z TRACE wgpu_core::device::global: Buffer::drop Id(60,1)
+2025-10-22T15:45:04.957420Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:04.957487Z TRACE wgpu_core::device::global: Buffer::drop Id(62,1)
+2025-10-22T15:45:04.957556Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:04.957622Z TRACE wgpu_core::device::global: Buffer::drop Id(64,1)
+2025-10-22T15:45:04.957701Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:04.957788Z TRACE wgpu_core::device::global: Buffer::drop Id(66,1)
+2025-10-22T15:45:04.957864Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:04.957950Z TRACE wgpu_core::device::global: Buffer::drop Id(57,1)
+2025-10-22T15:45:04.958046Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:04.958126Z TRACE wgpu_core::device::global: Buffer::drop Id(59,1)
+2025-10-22T15:45:04.958204Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:04.958271Z TRACE wgpu_core::device::global: Buffer::drop Id(61,1)
+2025-10-22T15:45:04.958324Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:04.958392Z TRACE wgpu_core::device::global: Buffer::drop Id(63,1)
+2025-10-22T15:45:04.958462Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:04.958570Z TRACE wgpu_core::device::global: Buffer::drop Id(54,1)
+2025-10-22T15:45:04.958627Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:04.958681Z TRACE wgpu_core::device::global: Buffer::drop Id(56,1)
+2025-10-22T15:45:04.958731Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:04.958783Z TRACE wgpu_core::device::global: Buffer::drop Id(14,3)
+2025-10-22T15:45:04.958840Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:04.958892Z TRACE wgpu_core::device::global: Buffer::drop Id(53,1)
+2025-10-22T15:45:04.958940Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:04.958990Z TRACE wgpu_core::device::global: Buffer::drop Id(17,2)
+2025-10-22T15:45:04.959039Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:04.959090Z TRACE wgpu_core::device::global: Buffer::drop Id(55,1)
+2025-10-22T15:45:04.959143Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:04.959200Z TRACE wgpu_core::device::global: Buffer::drop Id(9,2)
+2025-10-22T15:45:04.959308Z TRACE wgpu_core::device::global: Buffer::drop Id(22,2)
+2025-10-22T15:45:04.959360Z TRACE wgpu_core::device::global: BindGroup::drop Id(21,1)
+2025-10-22T15:45:04.959413Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with '' label
+2025-10-22T15:45:04.959467Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:04.959521Z TRACE wgpu_core::device::global: Buffer::drop Id(46,1)
+2025-10-22T15:45:04.959572Z TRACE wgpu_core::resource: Destroy raw Buffer with 'material uniform data 0' label
+2025-10-22T15:45:04.959628Z TRACE wgpu_core::device::global: BindGroup::drop Id(36,1)
+2025-10-22T15:45:04.959677Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'StandardMaterial' label
+2025-10-22T15:45:04.959746Z TRACE wgpu_core::device::global: Buffer::drop Id(47,1)
+2025-10-22T15:45:04.959813Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:04.959880Z TRACE wgpu_core::device::global: TextureView::drop Id(17,1)
+2025-10-22T15:45:04.959940Z TRACE wgpu_core::resource: Destroy raw TextureView with '' label
+2025-10-22T15:45:04.960008Z TRACE wgpu_core::device::global: Texture::drop Id(17,1)
+2025-10-22T15:45:04.960065Z TRACE wgpu_core::resource: Destroy raw Texture with '' label
+2025-10-22T15:45:04.960135Z TRACE wgpu_core::device::global: Buffer::drop Id(19,2)
+2025-10-22T15:45:04.960212Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:04.960311Z TRACE wgpu_core::device::global: Buffer::drop Id(2,1)
+2025-10-22T15:45:04.960394Z TRACE wgpu_core::resource: Destroy raw Buffer with 'bindless fallback buffer' label
+2025-10-22T15:45:04.960498Z TRACE wgpu_core::device::global: Buffer::drop Id(33,1)
+2025-10-22T15:45:04.960587Z TRACE wgpu_core::device::global: Buffer::drop Id(35,1)
+2025-10-22T15:45:04.960651Z TRACE wgpu_core::device::global: Buffer::drop Id(29,1)
+2025-10-22T15:45:04.960720Z TRACE wgpu_core::device::global: Buffer::drop Id(28,1)
+2025-10-22T15:45:04.960788Z TRACE wgpu_core::device::global: Buffer::drop Id(11,1)
+2025-10-22T15:45:04.960864Z TRACE wgpu_core::device::global: Buffer::drop Id(26,1)
+2025-10-22T15:45:04.960938Z TRACE wgpu_core::device::global: Buffer::drop Id(31,1)
+2025-10-22T15:45:04.961013Z TRACE wgpu_core::device::global: Buffer::drop Id(75,6)
+2025-10-22T15:45:04.961082Z TRACE wgpu_core::resource: Destroy raw Buffer with 'LineGizmo Position Buffer' label
+2025-10-22T15:45:04.961155Z TRACE wgpu_core::device::global: Buffer::drop Id(74,6)
+2025-10-22T15:45:04.961224Z TRACE wgpu_core::resource: Destroy raw Buffer with 'LineGizmo Color Buffer' label
+2025-10-22T15:45:04.961307Z TRACE wgpu_core::device::global: Buffer::drop Id(81,5)
+2025-10-22T15:45:04.961376Z TRACE wgpu_core::device::global: Buffer::drop Id(82,5)
+2025-10-22T15:45:04.961459Z TRACE wgpu_core::device::global: PipelineLayout::drop Id(1,1)
+2025-10-22T15:45:04.961515Z TRACE wgpu_core::binding_model: Destroy raw PipelineLayout with '' label
+2025-10-22T15:45:04.961580Z TRACE wgpu_core::device::global: PipelineLayout::drop Id(15,1)
+2025-10-22T15:45:04.961630Z TRACE wgpu_core::binding_model: Destroy raw PipelineLayout with '' label
+2025-10-22T15:45:04.961685Z TRACE wgpu_core::device::global: PipelineLayout::drop Id(27,1)
+2025-10-22T15:45:04.961735Z TRACE wgpu_core::binding_model: Destroy raw PipelineLayout with '' label
+2025-10-22T15:45:04.961790Z TRACE wgpu_core::device::global: PipelineLayout::drop Id(7,1)
+2025-10-22T15:45:04.961839Z TRACE wgpu_core::binding_model: Destroy raw PipelineLayout with '' label
+2025-10-22T15:45:04.961893Z TRACE wgpu_core::device::global: PipelineLayout::drop Id(23,1)
+2025-10-22T15:45:04.961944Z TRACE wgpu_core::binding_model: Destroy raw PipelineLayout with '' label
+2025-10-22T15:45:04.961998Z TRACE wgpu_core::device::global: PipelineLayout::drop Id(22,1)
+2025-10-22T15:45:04.962046Z TRACE wgpu_core::binding_model: Destroy raw PipelineLayout with '' label
+2025-10-22T15:45:04.962100Z TRACE wgpu_core::device::global: PipelineLayout::drop Id(17,1)
+2025-10-22T15:45:04.962150Z TRACE wgpu_core::binding_model: Destroy raw PipelineLayout with '' label
+2025-10-22T15:45:04.962203Z TRACE wgpu_core::device::global: PipelineLayout::drop Id(9,1)
+2025-10-22T15:45:04.962300Z TRACE wgpu_core::binding_model: Destroy raw PipelineLayout with '' label
+2025-10-22T15:45:04.962395Z TRACE wgpu_core::device::global: PipelineLayout::drop Id(16,1)
+2025-10-22T15:45:04.962478Z TRACE wgpu_core::binding_model: Destroy raw PipelineLayout with '' label
+2025-10-22T15:45:04.962545Z TRACE wgpu_core::device::global: PipelineLayout::drop Id(12,1)
+2025-10-22T15:45:04.962615Z TRACE wgpu_core::binding_model: Destroy raw PipelineLayout with '' label
+2025-10-22T15:45:04.962689Z TRACE wgpu_core::device::global: PipelineLayout::drop Id(25,1)
+2025-10-22T15:45:04.962754Z TRACE wgpu_core::binding_model: Destroy raw PipelineLayout with '' label
+2025-10-22T15:45:04.962842Z TRACE wgpu_core::device::global: PipelineLayout::drop Id(28,1)
+2025-10-22T15:45:04.962923Z TRACE wgpu_core::binding_model: Destroy raw PipelineLayout with '' label
+2025-10-22T15:45:04.963033Z TRACE wgpu_core::device::global: PipelineLayout::drop Id(14,1)
+2025-10-22T15:45:04.963111Z TRACE wgpu_core::binding_model: Destroy raw PipelineLayout with '' label
+2025-10-22T15:45:04.963354Z TRACE wgpu_core::device::global: PipelineLayout::drop Id(10,1)
+2025-10-22T15:45:04.963442Z TRACE wgpu_core::binding_model: Destroy raw PipelineLayout with '' label
+2025-10-22T15:45:04.963534Z TRACE wgpu_core::device::global: PipelineLayout::drop Id(3,1)
+2025-10-22T15:45:04.963600Z TRACE wgpu_core::binding_model: Destroy raw PipelineLayout with '' label
+2025-10-22T15:45:04.963694Z TRACE wgpu_core::device::global: PipelineLayout::drop Id(13,1)
+2025-10-22T15:45:04.963772Z TRACE wgpu_core::binding_model: Destroy raw PipelineLayout with '' label
+2025-10-22T15:45:04.963864Z TRACE wgpu_core::device::global: PipelineLayout::drop Id(0,1)
+2025-10-22T15:45:04.963941Z TRACE wgpu_core::binding_model: Destroy raw PipelineLayout with '' label
+2025-10-22T15:45:04.964026Z TRACE wgpu_core::device::global: PipelineLayout::drop Id(6,1)
+2025-10-22T15:45:04.964102Z TRACE wgpu_core::binding_model: Destroy raw PipelineLayout with '' label
+2025-10-22T15:45:04.964199Z TRACE wgpu_core::device::global: PipelineLayout::drop Id(19,1)
+2025-10-22T15:45:04.964270Z TRACE wgpu_core::binding_model: Destroy raw PipelineLayout with '' label
+2025-10-22T15:45:04.964358Z TRACE wgpu_core::device::global: PipelineLayout::drop Id(26,1)
+2025-10-22T15:45:04.964438Z TRACE wgpu_core::binding_model: Destroy raw PipelineLayout with '' label
+2025-10-22T15:45:04.964536Z TRACE wgpu_core::device::global: PipelineLayout::drop Id(11,1)
+2025-10-22T15:45:04.964616Z TRACE wgpu_core::binding_model: Destroy raw PipelineLayout with '' label
+2025-10-22T15:45:04.964734Z TRACE wgpu_core::device::global: PipelineLayout::drop Id(21,1)
+2025-10-22T15:45:04.964818Z TRACE wgpu_core::binding_model: Destroy raw PipelineLayout with '' label
+2025-10-22T15:45:04.964909Z TRACE wgpu_core::device::global: PipelineLayout::drop Id(8,1)
+2025-10-22T15:45:04.965002Z TRACE wgpu_core::binding_model: Destroy raw PipelineLayout with '' label
+2025-10-22T15:45:04.965093Z TRACE wgpu_core::device::global: PipelineLayout::drop Id(2,1)
+2025-10-22T15:45:04.965158Z TRACE wgpu_core::binding_model: Destroy raw PipelineLayout with '' label
+2025-10-22T15:45:04.965228Z TRACE wgpu_core::device::global: PipelineLayout::drop Id(4,1)
+2025-10-22T15:45:04.965293Z TRACE wgpu_core::binding_model: Destroy raw PipelineLayout with '' label
+2025-10-22T15:45:04.965372Z TRACE wgpu_core::device::global: PipelineLayout::drop Id(5,1)
+2025-10-22T15:45:04.965450Z TRACE wgpu_core::binding_model: Destroy raw PipelineLayout with '' label
+2025-10-22T15:45:04.965518Z TRACE wgpu_core::device::global: PipelineLayout::drop Id(24,1)
+2025-10-22T15:45:04.965590Z TRACE wgpu_core::binding_model: Destroy raw PipelineLayout with '' label
+2025-10-22T15:45:04.965650Z TRACE wgpu_core::device::global: PipelineLayout::drop Id(20,1)
+2025-10-22T15:45:04.965724Z TRACE wgpu_core::binding_model: Destroy raw PipelineLayout with '' label
+2025-10-22T15:45:04.965787Z TRACE wgpu_core::device::global: PipelineLayout::drop Id(18,1)
+2025-10-22T15:45:04.965837Z TRACE wgpu_core::binding_model: Destroy raw PipelineLayout with '' label
+2025-10-22T15:45:04.966006Z TRACE wgpu_core::device::global: BindGroupLayout::drop Id(34,1)
+2025-10-22T15:45:04.966072Z TRACE wgpu_core::device::global: BindGroupLayout::drop Id(4,1)
+2025-10-22T15:45:04.966143Z TRACE wgpu_core::binding_model: Destroy raw BindGroupLayout with 'downsample multisample depth bind group layout' label
+2025-10-22T15:45:04.966273Z TRACE wgpu_core::device::global: BindGroupLayout::drop Id(25,1)
+2025-10-22T15:45:04.966333Z TRACE wgpu_core::device::global: BindGroupLayout::drop Id(37,1)
+2025-10-22T15:45:04.966399Z TRACE wgpu_core::device::global: BindGroupLayout::drop Id(33,1)
+2025-10-22T15:45:04.966473Z TRACE wgpu_core::binding_model: Destroy raw BindGroupLayout with 'mesh2d_view_layout' label
+2025-10-22T15:45:04.966551Z TRACE wgpu_core::device::global: BindGroupLayout::drop Id(7,1)
+2025-10-22T15:45:04.966615Z TRACE wgpu_core::binding_model: Destroy raw BindGroupLayout with 'ssao_common_bind_group_layout' label
+2025-10-22T15:45:04.966674Z TRACE wgpu_core::device::global: BindGroupLayout::drop Id(8,1)
+2025-10-22T15:45:04.966734Z TRACE wgpu_core::binding_model: Destroy raw BindGroupLayout with 'tonemapping_hdr_texture_bind_group_layout' label
+2025-10-22T15:45:04.966816Z TRACE wgpu_core::device::global: BindGroupLayout::drop Id(27,1)
+2025-10-22T15:45:04.966880Z TRACE wgpu_core::binding_model: Destroy raw BindGroupLayout with 'copy_bind_group_layout' label
+2025-10-22T15:45:04.966957Z TRACE wgpu_core::device::global: BindGroupLayout::drop Id(31,1)
+2025-10-22T15:45:04.967028Z TRACE wgpu_core::binding_model: Destroy raw BindGroupLayout with 'transmittance_lut_bind_group_layout' label
+2025-10-22T15:45:04.967101Z TRACE wgpu_core::device::global: BindGroupLayout::drop Id(14,1)
+2025-10-22T15:45:04.967168Z TRACE wgpu_core::binding_model: Destroy raw BindGroupLayout with 'blit_bind_group_layout' label
+2025-10-22T15:45:04.967236Z TRACE wgpu_core::device::global: BindGroupLayout::drop Id(11,1)
+2025-10-22T15:45:04.967286Z TRACE wgpu_core::binding_model: Destroy raw BindGroupLayout with 'sprite_view_layout' label
+2025-10-22T15:45:04.967342Z TRACE wgpu_core::device::global: BindGroupLayout::drop Id(21,1)
+2025-10-22T15:45:04.967404Z TRACE wgpu_core::device::global: BindGroupLayout::drop Id(28,1)
+2025-10-22T15:45:04.967459Z TRACE wgpu_core::binding_model: Destroy raw BindGroupLayout with 'ssao_preprocess_depth_bind_group_layout' label
+2025-10-22T15:45:04.967532Z TRACE wgpu_core::device::global: BindGroupLayout::drop Id(41,1)
+2025-10-22T15:45:04.967588Z TRACE wgpu_core::device::global: BindGroupLayout::drop Id(17,1)
+2025-10-22T15:45:04.967637Z TRACE wgpu_core::binding_model: Destroy raw BindGroupLayout with 'multiscattering_lut_bind_group_layout' label
+2025-10-22T15:45:04.967697Z TRACE wgpu_core::device::global: BindGroupLayout::drop Id(35,1)
+2025-10-22T15:45:04.967838Z TRACE wgpu_core::device::global: BindGroupLayout::drop Id(18,1)
+2025-10-22T15:45:04.967889Z TRACE wgpu_core::binding_model: Destroy raw BindGroupLayout with 'build non-indexed indirect parameters bind group layout' label
+2025-10-22T15:45:04.967972Z TRACE wgpu_core::device::global: BindGroupLayout::drop Id(12,1)
+2025-10-22T15:45:04.968033Z TRACE wgpu_core::device::global: BindGroupLayout::drop Id(22,1)
+2025-10-22T15:45:04.968107Z TRACE wgpu_core::binding_model: Destroy raw BindGroupLayout with 'aerial_view_lut_bind_group_layout' label
+2025-10-22T15:45:04.968233Z TRACE wgpu_core::device::global: BindGroupLayout::drop Id(6,1)
+2025-10-22T15:45:04.968296Z TRACE wgpu_core::binding_model: Destroy raw BindGroupLayout with 'ssao_spatial_denoise_bind_group_layout' label
+2025-10-22T15:45:04.968377Z TRACE wgpu_core::device::global: BindGroupLayout::drop Id(32,1)
+2025-10-22T15:45:04.968463Z TRACE wgpu_core::device::global: BindGroupLayout::drop Id(2,1)
+2025-10-22T15:45:04.968543Z TRACE wgpu_core::binding_model: Destroy raw BindGroupLayout with 'ColorMaterial' label
+2025-10-22T15:45:04.968625Z TRACE wgpu_core::device::global: BindGroupLayout::drop Id(40,1)
+2025-10-22T15:45:04.968704Z TRACE wgpu_core::device::global: BindGroupLayout::drop Id(24,1)
+2025-10-22T15:45:04.968785Z TRACE wgpu_core::binding_model: Destroy raw BindGroupLayout with 'sprite_material_layout' label
+2025-10-22T15:45:04.968878Z TRACE wgpu_core::device::global: BindGroupLayout::drop Id(45,1)
+2025-10-22T15:45:04.968949Z TRACE wgpu_core::binding_model: Destroy raw BindGroupLayout with 'mesh_view_layout_multisampled_binding_array' label
+2025-10-22T15:45:04.969034Z TRACE wgpu_core::device::global: BindGroupLayout::drop Id(5,1)
+2025-10-22T15:45:04.969103Z TRACE wgpu_core::binding_model: Destroy raw BindGroupLayout with 'copy_deferred_lighting_id_bind_group_layout' label
+2025-10-22T15:45:04.969181Z TRACE wgpu_core::device::global: BindGroupLayout::drop Id(26,1)
+2025-10-22T15:45:04.969235Z TRACE wgpu_core::binding_model: Destroy raw BindGroupLayout with 'environment_bind_group_layout' label
+2025-10-22T15:45:04.969324Z TRACE wgpu_core::device::global: BindGroupLayout::drop Id(19,1)
+2025-10-22T15:45:04.969400Z TRACE wgpu_core::binding_model: Destroy raw BindGroupLayout with 'build mesh uniforms GPU early occlusion culling bind group layout' label
+2025-10-22T15:45:04.969493Z TRACE wgpu_core::device::global: BindGroupLayout::drop Id(3,1)
+2025-10-22T15:45:04.969568Z TRACE wgpu_core::binding_model: Destroy raw BindGroupLayout with 'StandardMaterial' label
+2025-10-22T15:45:04.969650Z TRACE wgpu_core::device::global: BindGroupLayout::drop Id(36,1)
+2025-10-22T15:45:04.969702Z TRACE wgpu_core::device::global: BindGroupLayout::drop Id(23,1)
+2025-10-22T15:45:04.969774Z TRACE wgpu_core::binding_model: Destroy raw BindGroupLayout with 'ui_view_layout' label
+2025-10-22T15:45:04.969875Z TRACE wgpu_core::device::global: BindGroupLayout::drop Id(42,1)
+2025-10-22T15:45:04.969948Z TRACE wgpu_core::binding_model: Destroy raw BindGroupLayout with 'mesh_view_layout_multisampled' label
+2025-10-22T15:45:04.970049Z TRACE wgpu_core::device::global: BindGroupLayout::drop Id(39,1)
+2025-10-22T15:45:04.970129Z TRACE wgpu_core::device::global: BindGroupLayout::drop Id(44,1)
+2025-10-22T15:45:04.970202Z TRACE wgpu_core::device::global: BindGroupLayout::drop Id(38,1)
+2025-10-22T15:45:04.970285Z TRACE wgpu_core::binding_model: Destroy raw BindGroupLayout with '' label
+2025-10-22T15:45:04.970379Z TRACE wgpu_core::device::global: BindGroupLayout::drop Id(1,1)
+2025-10-22T15:45:04.970466Z TRACE wgpu_core::device::global: BindGroupLayout::drop Id(15,1)
+2025-10-22T15:45:04.970532Z TRACE wgpu_core::binding_model: Destroy raw BindGroupLayout with 'irradiance_bind_group_layout' label
+2025-10-22T15:45:04.970602Z TRACE wgpu_core::device::global: BindGroupLayout::drop Id(16,1)
+2025-10-22T15:45:04.970653Z TRACE wgpu_core::binding_model: Destroy raw BindGroupLayout with 'build mesh uniforms direct bind group layout' label
+2025-10-22T15:45:04.970713Z TRACE wgpu_core::device::global: BindGroupLayout::drop Id(9,1)
+2025-10-22T15:45:04.970762Z TRACE wgpu_core::binding_model: Destroy raw BindGroupLayout with 'downsample depth bind group layout' label
+2025-10-22T15:45:04.970823Z TRACE wgpu_core::device::global: BindGroupLayout::drop Id(13,1)
+2025-10-22T15:45:04.970878Z TRACE wgpu_core::binding_model: Destroy raw BindGroupLayout with 'build mesh uniforms GPU frustum culling bind group layout' label
+2025-10-22T15:45:04.970939Z TRACE wgpu_core::device::global: BindGroupLayout::drop Id(29,1)
+2025-10-22T15:45:04.971032Z TRACE wgpu_core::binding_model: Destroy raw BindGroupLayout with 'build mesh uniforms GPU late occlusion culling bind group layout' label
+2025-10-22T15:45:04.971113Z TRACE wgpu_core::device::global: BindGroupLayout::drop Id(46,1)
+2025-10-22T15:45:04.971167Z TRACE wgpu_core::device::global: BindGroupLayout::drop Id(30,1)
+2025-10-22T15:45:04.971218Z TRACE wgpu_core::binding_model: Destroy raw BindGroupLayout with 'sky_view_lut_bind_group_layout' label
+2025-10-22T15:45:04.971279Z TRACE wgpu_core::device::global: BindGroupLayout::drop Id(10,1)
+2025-10-22T15:45:04.971329Z TRACE wgpu_core::binding_model: Destroy raw BindGroupLayout with 'downsampling_bind_group_layout_combined' label
+2025-10-22T15:45:04.971393Z TRACE wgpu_core::device::global: BindGroupLayout::drop Id(20,1)
+2025-10-22T15:45:04.971448Z TRACE wgpu_core::device::global: BindGroupLayout::drop Id(43,1)
+2025-10-22T15:45:04.971510Z TRACE wgpu_core::device::global: ShaderModule::drop Id(27,1)
+2025-10-22T15:45:04.971594Z TRACE wgpu_core::pipeline: Destroy raw ShaderModule with '' label
+2025-10-22T15:45:04.971699Z TRACE wgpu_core::device::global: ShaderModule::drop Id(31,1)
+2025-10-22T15:45:04.971759Z TRACE wgpu_core::pipeline: Destroy raw ShaderModule with '' label
+2025-10-22T15:45:04.971916Z TRACE wgpu_core::device::global: ShaderModule::drop Id(23,1)
+2025-10-22T15:45:04.971972Z TRACE wgpu_core::pipeline: Destroy raw ShaderModule with '' label
+2025-10-22T15:45:04.972061Z TRACE wgpu_core::device::global: ShaderModule::drop Id(39,1)
+2025-10-22T15:45:04.972110Z TRACE wgpu_core::pipeline: Destroy raw ShaderModule with '' label
+2025-10-22T15:45:04.972490Z TRACE wgpu_core::device::global: ShaderModule::drop Id(4,1)
+2025-10-22T15:45:04.972554Z TRACE wgpu_core::pipeline: Destroy raw ShaderModule with '' label
+2025-10-22T15:45:04.972670Z TRACE wgpu_core::device::global: ShaderModule::drop Id(25,1)
+2025-10-22T15:45:04.972738Z TRACE wgpu_core::pipeline: Destroy raw ShaderModule with '' label
+2025-10-22T15:45:04.972908Z TRACE wgpu_core::device::global: ShaderModule::drop Id(28,1)
+2025-10-22T15:45:04.973001Z TRACE wgpu_core::pipeline: Destroy raw ShaderModule with '' label
+2025-10-22T15:45:04.973143Z TRACE wgpu_core::device::global: ShaderModule::drop Id(14,1)
+2025-10-22T15:45:04.973193Z TRACE wgpu_core::pipeline: Destroy raw ShaderModule with '' label
+2025-10-22T15:45:04.973258Z TRACE wgpu_core::device::global: ShaderModule::drop Id(20,1)
+2025-10-22T15:45:04.973308Z TRACE wgpu_core::pipeline: Destroy raw ShaderModule with '' label
+2025-10-22T15:45:04.973440Z TRACE wgpu_core::device::global: ShaderModule::drop Id(7,1)
+2025-10-22T15:45:04.973489Z TRACE wgpu_core::pipeline: Destroy raw ShaderModule with '' label
+2025-10-22T15:45:04.973595Z TRACE wgpu_core::device::global: ShaderModule::drop Id(0,1)
+2025-10-22T15:45:04.973644Z TRACE wgpu_core::pipeline: Destroy raw ShaderModule with '' label
+2025-10-22T15:45:04.973771Z TRACE wgpu_core::device::global: ShaderModule::drop Id(3,1)
+2025-10-22T15:45:04.973833Z TRACE wgpu_core::pipeline: Destroy raw ShaderModule with '' label
+2025-10-22T15:45:04.973958Z TRACE wgpu_core::device::global: ShaderModule::drop Id(26,1)
+2025-10-22T15:45:04.974008Z TRACE wgpu_core::pipeline: Destroy raw ShaderModule with '' label
+2025-10-22T15:45:04.974070Z TRACE wgpu_core::device::global: ShaderModule::drop Id(30,1)
+2025-10-22T15:45:04.974122Z TRACE wgpu_core::pipeline: Destroy raw ShaderModule with '' label
+2025-10-22T15:45:04.974182Z TRACE wgpu_core::device::global: ShaderModule::drop Id(8,1)
+2025-10-22T15:45:04.974230Z TRACE wgpu_core::pipeline: Destroy raw ShaderModule with '' label
+2025-10-22T15:45:04.974330Z TRACE wgpu_core::device::global: ShaderModule::drop Id(15,1)
+2025-10-22T15:45:04.974400Z TRACE wgpu_core::pipeline: Destroy raw ShaderModule with '' label
+2025-10-22T15:45:04.974501Z TRACE wgpu_core::device::global: ShaderModule::drop Id(6,1)
+2025-10-22T15:45:04.974555Z TRACE wgpu_core::pipeline: Destroy raw ShaderModule with '' label
+2025-10-22T15:45:04.975770Z TRACE wgpu_core::device::global: ShaderModule::drop Id(17,1)
+2025-10-22T15:45:04.975854Z TRACE wgpu_core::pipeline: Destroy raw ShaderModule with '' label
+2025-10-22T15:45:04.976078Z TRACE wgpu_core::device::global: ShaderModule::drop Id(37,1)
+2025-10-22T15:45:04.976146Z TRACE wgpu_core::pipeline: Destroy raw ShaderModule with '' label
+2025-10-22T15:45:04.976246Z TRACE wgpu_core::device::global: ShaderModule::drop Id(11,1)
+2025-10-22T15:45:04.976296Z TRACE wgpu_core::pipeline: Destroy raw ShaderModule with '' label
+2025-10-22T15:45:04.976372Z TRACE wgpu_core::device::global: ShaderModule::drop Id(13,1)
+2025-10-22T15:45:04.976423Z TRACE wgpu_core::pipeline: Destroy raw ShaderModule with '' label
+2025-10-22T15:45:04.976488Z TRACE wgpu_core::device::global: ShaderModule::drop Id(10,1)
+2025-10-22T15:45:04.976537Z TRACE wgpu_core::pipeline: Destroy raw ShaderModule with '' label
+2025-10-22T15:45:04.976599Z TRACE wgpu_core::device::global: ShaderModule::drop Id(16,1)
+2025-10-22T15:45:04.976647Z TRACE wgpu_core::pipeline: Destroy raw ShaderModule with '' label
+2025-10-22T15:45:04.976709Z TRACE wgpu_core::device::global: ShaderModule::drop Id(22,1)
+2025-10-22T15:45:04.976757Z TRACE wgpu_core::pipeline: Destroy raw ShaderModule with '' label
+2025-10-22T15:45:04.976825Z TRACE wgpu_core::device::global: ShaderModule::drop Id(5,1)
+2025-10-22T15:45:04.976873Z TRACE wgpu_core::pipeline: Destroy raw ShaderModule with '' label
+2025-10-22T15:45:04.976941Z TRACE wgpu_core::device::global: ShaderModule::drop Id(18,1)
+2025-10-22T15:45:04.976989Z TRACE wgpu_core::pipeline: Destroy raw ShaderModule with '' label
+2025-10-22T15:45:04.977185Z TRACE wgpu_core::device::global: ShaderModule::drop Id(9,1)
+2025-10-22T15:45:04.977258Z TRACE wgpu_core::pipeline: Destroy raw ShaderModule with '' label
+2025-10-22T15:45:04.977373Z TRACE wgpu_core::device::global: ShaderModule::drop Id(24,1)
+2025-10-22T15:45:04.977446Z TRACE wgpu_core::pipeline: Destroy raw ShaderModule with '' label
+2025-10-22T15:45:04.977615Z TRACE wgpu_core::device::global: ShaderModule::drop Id(12,1)
+2025-10-22T15:45:04.977675Z TRACE wgpu_core::pipeline: Destroy raw ShaderModule with '' label
+2025-10-22T15:45:04.977862Z TRACE wgpu_core::device::global: ShaderModule::drop Id(33,1)
+2025-10-22T15:45:04.977924Z TRACE wgpu_core::pipeline: Destroy raw ShaderModule with '' label
+2025-10-22T15:45:04.978249Z TRACE wgpu_core::device::global: ShaderModule::drop Id(36,1)
+2025-10-22T15:45:04.978327Z TRACE wgpu_core::pipeline: Destroy raw ShaderModule with '' label
+2025-10-22T15:45:04.978671Z TRACE wgpu_core::device::global: ShaderModule::drop Id(19,1)
+2025-10-22T15:45:04.978741Z TRACE wgpu_core::pipeline: Destroy raw ShaderModule with '' label
+2025-10-22T15:45:04.978912Z TRACE wgpu_core::device::global: ShaderModule::drop Id(21,1)
+2025-10-22T15:45:04.979000Z TRACE wgpu_core::pipeline: Destroy raw ShaderModule with '' label
+2025-10-22T15:45:04.979111Z TRACE wgpu_core::device::global: ShaderModule::drop Id(2,1)
+2025-10-22T15:45:04.979161Z TRACE wgpu_core::pipeline: Destroy raw ShaderModule with '' label
+2025-10-22T15:45:04.979240Z TRACE wgpu_core::device::global: ShaderModule::drop Id(1,1)
+2025-10-22T15:45:04.979289Z TRACE wgpu_core::pipeline: Destroy raw ShaderModule with '' label
+2025-10-22T15:45:04.979383Z TRACE wgpu_core::device::global: ShaderModule::drop Id(34,1)
+2025-10-22T15:45:04.979451Z TRACE wgpu_core::pipeline: Destroy raw ShaderModule with '' label
+2025-10-22T15:45:04.979542Z TRACE wgpu_core::device::global: ShaderModule::drop Id(32,1)
+2025-10-22T15:45:04.979594Z TRACE wgpu_core::pipeline: Destroy raw ShaderModule with '' label
+2025-10-22T15:45:04.979691Z TRACE wgpu_core::device::global: ShaderModule::drop Id(35,1)
+2025-10-22T15:45:04.979761Z TRACE wgpu_core::pipeline: Destroy raw ShaderModule with '' label
+2025-10-22T15:45:04.979993Z TRACE wgpu_core::device::global: ShaderModule::drop Id(29,1)
+2025-10-22T15:45:04.980053Z TRACE wgpu_core::pipeline: Destroy raw ShaderModule with '' label
+2025-10-22T15:45:04.980184Z TRACE wgpu_core::device::global: ShaderModule::drop Id(38,1)
+2025-10-22T15:45:04.980257Z TRACE wgpu_core::pipeline: Destroy raw ShaderModule with '' label
+2025-10-22T15:45:04.984257Z TRACE wgpu_core::device::global: Buffer::drop Id(34,1)
+2025-10-22T15:45:04.984408Z TRACE wgpu_core::device::global: TextureView::drop Id(36,7)
+2025-10-22T15:45:04.984461Z TRACE wgpu_core::device::global: Texture::drop Id(26,790)
+2025-10-22T15:45:04.984708Z TRACE wgpu_core::device::global: Buffer::drop Id(24,1)
+2025-10-22T15:45:04.984770Z TRACE wgpu_core::resource: Destroy raw Buffer with 'general mesh slab 1 (index buffer)' label
+2025-10-22T15:45:04.984990Z TRACE wgpu_core::device::global: Buffer::drop Id(25,1)
+2025-10-22T15:45:04.985074Z TRACE wgpu_core::resource: Destroy raw Buffer with 'general mesh slab 3 (vertex buffer)' label
+2025-10-22T15:45:04.985317Z TRACE wgpu_core::device::global: Buffer::drop Id(6,1)
+2025-10-22T15:45:04.985381Z TRACE wgpu_core::resource: Destroy raw Buffer with 'general mesh slab 0 (vertex buffer)' label
+2025-10-22T15:45:04.985626Z TRACE wgpu_core::device::global: Buffer::drop Id(8,1)
+2025-10-22T15:45:04.985694Z TRACE wgpu_core::resource: Destroy raw Buffer with 'general mesh slab 2 (vertex buffer)' label
+2025-10-22T15:45:04.985921Z TRACE wgpu_core::device::global: Buffer::drop Id(7,2)
+2025-10-22T15:45:04.985983Z TRACE wgpu_core::resource: Destroy raw Buffer with 'general mesh slab 4 (vertex buffer)' label
+2025-10-22T15:45:04.986086Z TRACE wgpu_core::device::global: TextureView::drop Id(0,1)
+2025-10-22T15:45:04.986143Z TRACE wgpu_core::resource: Destroy raw TextureView with '' label
+2025-10-22T15:45:04.986199Z TRACE wgpu_core::device::global: Texture::drop Id(0,1)
+2025-10-22T15:45:04.986256Z TRACE wgpu_core::resource: Destroy raw Texture with '' label
+2025-10-22T15:45:04.986319Z TRACE wgpu_core::device::global: TextureView::drop Id(1,1)
+2025-10-22T15:45:04.986377Z TRACE wgpu_core::resource: Destroy raw TextureView with '' label
+2025-10-22T15:45:04.986429Z TRACE wgpu_core::device::global: Texture::drop Id(1,1)
+2025-10-22T15:45:04.986479Z TRACE wgpu_core::resource: Destroy raw Texture with '' label
+2025-10-22T15:45:04.986536Z TRACE wgpu_core::device::global: TextureView::drop Id(2,1)
+2025-10-22T15:45:04.986588Z TRACE wgpu_core::resource: Destroy raw TextureView with '' label
+2025-10-22T15:45:04.986647Z TRACE wgpu_core::device::global: Texture::drop Id(2,1)
+2025-10-22T15:45:04.986697Z TRACE wgpu_core::resource: Destroy raw Texture with '' label
+2025-10-22T15:45:04.986749Z TRACE wgpu_core::device::global: TextureView::drop Id(3,1)
+2025-10-22T15:45:04.986798Z TRACE wgpu_core::resource: Destroy raw TextureView with '' label
+2025-10-22T15:45:04.986846Z TRACE wgpu_core::device::global: Texture::drop Id(3,1)
+2025-10-22T15:45:04.986897Z TRACE wgpu_core::resource: Destroy raw Texture with '' label
+2025-10-22T15:45:04.986952Z TRACE wgpu_core::device::global: TextureView::drop Id(4,1)
+2025-10-22T15:45:04.987000Z TRACE wgpu_core::resource: Destroy raw TextureView with '' label
+2025-10-22T15:45:04.987048Z TRACE wgpu_core::device::global: Texture::drop Id(4,1)
+2025-10-22T15:45:04.987106Z TRACE wgpu_core::resource: Destroy raw Texture with '' label
+2025-10-22T15:45:04.987158Z TRACE wgpu_core::device::global: TextureView::drop Id(5,1)
+2025-10-22T15:45:04.987205Z TRACE wgpu_core::resource: Destroy raw TextureView with '' label
+2025-10-22T15:45:04.987253Z TRACE wgpu_core::device::global: Texture::drop Id(5,1)
+2025-10-22T15:45:04.987300Z TRACE wgpu_core::resource: Destroy raw Texture with '' label
+2025-10-22T15:45:04.987355Z TRACE wgpu_core::device::global: TextureView::drop Id(6,1)
+2025-10-22T15:45:04.987403Z TRACE wgpu_core::resource: Destroy raw TextureView with '' label
+2025-10-22T15:45:04.987451Z TRACE wgpu_core::device::global: Texture::drop Id(6,1)
+2025-10-22T15:45:04.987499Z TRACE wgpu_core::resource: Destroy raw Texture with '' label
+2025-10-22T15:45:04.987554Z TRACE wgpu_core::device::global: TextureView::drop Id(7,1)
+2025-10-22T15:45:04.987602Z TRACE wgpu_core::resource: Destroy raw TextureView with '' label
+2025-10-22T15:45:04.987650Z TRACE wgpu_core::device::global: Texture::drop Id(7,1)
+2025-10-22T15:45:04.987704Z TRACE wgpu_core::resource: Destroy raw Texture with '' label
+2025-10-22T15:45:04.987758Z TRACE wgpu_core::device::global: TextureView::drop Id(43,1)
+2025-10-22T15:45:04.987806Z TRACE wgpu_core::resource: Destroy raw TextureView with '' label
+2025-10-22T15:45:04.987855Z TRACE wgpu_core::device::global: Texture::drop Id(37,1)
+2025-10-22T15:45:04.987915Z TRACE wgpu_core::resource: Destroy raw Texture with '' label
+2025-10-22T15:45:04.987985Z TRACE wgpu_core::device::global: Buffer::drop Id(0,1)
+2025-10-22T15:45:04.988045Z TRACE wgpu_core::device::global: Buffer::drop Id(1,1)
+2025-10-22T15:45:04.988458Z TRACE wgpu_core::device::global: Buffer::drop Id(13,2)
+2025-10-22T15:45:04.988551Z TRACE wgpu_core::device::global: Buffer::drop Id(32,2)
+2025-10-22T15:45:04.988644Z TRACE wgpu_core::device::global: Buffer::drop Id(36,1)
+2025-10-22T15:45:04.988722Z TRACE wgpu_core::device::global: Buffer::drop Id(38,1)
+2025-10-22T15:45:04.988823Z TRACE wgpu_core::device::global: Buffer::drop Id(48,2)
+2025-10-22T15:45:04.988960Z TRACE wgpu_core::device::global: Buffer::drop Id(21,4)
+2025-10-22T15:45:04.989041Z TRACE wgpu_core::device::global: Buffer::drop Id(78,1)
+2025-10-22T15:45:04.989112Z TRACE wgpu_core::device::global: Buffer::drop Id(79,1)
+2025-10-22T15:45:04.989169Z TRACE wgpu_core::device::global: Buffer::drop Id(80,1)
+2025-10-22T15:45:04.989227Z TRACE wgpu_core::device::global: Buffer::drop Id(40,1)
+2025-10-22T15:45:04.989279Z TRACE wgpu_core::device::global: Buffer::drop Id(42,1)
+2025-10-22T15:45:04.989395Z TRACE wgpu_core::device::global: TextureView::drop Id(9,1)
+2025-10-22T15:45:04.989447Z TRACE wgpu_core::resource: Destroy raw TextureView with '' label
+2025-10-22T15:45:04.989510Z TRACE wgpu_core::device::global: Texture::drop Id(9,1)
+2025-10-22T15:45:04.989564Z TRACE wgpu_core::resource: Destroy raw Texture with 'ssao_hilbert_index_lut' label
+2025-10-22T15:45:04.989631Z TRACE wgpu_core::device::global: Sampler::drop Id(1,1)
+2025-10-22T15:45:04.989682Z TRACE wgpu_core::resource: Destroy raw Sampler with '' label
+2025-10-22T15:45:04.989741Z TRACE wgpu_core::device::global: Sampler::drop Id(2,1)
+2025-10-22T15:45:04.989798Z TRACE wgpu_core::resource: Destroy raw Sampler with '' label
+2025-10-22T15:45:04.989883Z TRACE wgpu_core::device::global: Sampler::drop Id(3,1)
+2025-10-22T15:45:04.989948Z TRACE wgpu_core::resource: Destroy raw Sampler with 'transmittance_lut_sampler' label
+2025-10-22T15:45:04.990052Z TRACE wgpu_core::device::global: Sampler::drop Id(4,1)
+2025-10-22T15:45:04.990123Z TRACE wgpu_core::resource: Destroy raw Sampler with 'multiscattering_lut_sampler' label
+2025-10-22T15:45:04.990206Z TRACE wgpu_core::device::global: Sampler::drop Id(5,1)
+2025-10-22T15:45:04.990275Z TRACE wgpu_core::resource: Destroy raw Sampler with 'sky_view_lut_sampler' label
+2025-10-22T15:45:04.990356Z TRACE wgpu_core::device::global: Sampler::drop Id(6,1)
+2025-10-22T15:45:04.990413Z TRACE wgpu_core::resource: Destroy raw Sampler with 'aerial_view_lut_sampler' label
+2025-10-22T15:45:04.990509Z TRACE wgpu_core::device::global: TextureView::drop Id(12,1)
+2025-10-22T15:45:04.990560Z TRACE wgpu_core::resource: Destroy raw TextureView with '' label
+2025-10-22T15:45:04.990613Z TRACE wgpu_core::device::global: Texture::drop Id(12,1)
+2025-10-22T15:45:04.990661Z TRACE wgpu_core::resource: Destroy raw Texture with '' label
+2025-10-22T15:45:04.990734Z TRACE wgpu_core::device::global: Sampler::drop Id(7,1)
+2025-10-22T15:45:04.990799Z TRACE wgpu_core::resource: Destroy raw Sampler with '' label
+2025-10-22T15:45:04.990859Z TRACE wgpu_core::device::global: Sampler::drop Id(11,1)
+2025-10-22T15:45:04.990909Z TRACE wgpu_core::resource: Destroy raw Sampler with 'taa_nearest_sampler' label
+2025-10-22T15:45:04.990963Z TRACE wgpu_core::device::global: Sampler::drop Id(16,1)
+2025-10-22T15:45:04.991033Z TRACE wgpu_core::resource: Destroy raw Sampler with 'taa_linear_sampler' label
+2025-10-22T15:45:04.991123Z TRACE wgpu_core::device::global: Sampler::drop Id(10,1)
+2025-10-22T15:45:04.991199Z TRACE wgpu_core::resource: Destroy raw Sampler with '' label
+2025-10-22T15:45:04.991281Z TRACE wgpu_core::device::global: Sampler::drop Id(12,1)
+2025-10-22T15:45:04.991347Z TRACE wgpu_core::resource: Destroy raw Sampler with '' label
+2025-10-22T15:45:04.991414Z TRACE wgpu_core::device::global: Sampler::drop Id(17,1)
+2025-10-22T15:45:04.991493Z TRACE wgpu_core::resource: Destroy raw Sampler with '' label
+2025-10-22T15:45:04.991581Z TRACE wgpu_core::device::global: Sampler::drop Id(15,1)
+2025-10-22T15:45:04.991646Z TRACE wgpu_core::resource: Destroy raw Sampler with 'depth of field sampler' label
+2025-10-22T15:45:04.991701Z TRACE wgpu_core::device::global: Sampler::drop Id(9,1)
+2025-10-22T15:45:04.991765Z TRACE wgpu_core::resource: Destroy raw Sampler with '' label
+2025-10-22T15:45:04.991820Z TRACE wgpu_core::device::global: Sampler::drop Id(13,1)
+2025-10-22T15:45:04.991869Z TRACE wgpu_core::resource: Destroy raw Sampler with 'SSR color sampler' label
+2025-10-22T15:45:04.991920Z TRACE wgpu_core::device::global: Sampler::drop Id(20,1)
+2025-10-22T15:45:04.991967Z TRACE wgpu_core::resource: Destroy raw Sampler with 'SSR depth linear sampler' label
+2025-10-22T15:45:04.992018Z TRACE wgpu_core::device::global: Sampler::drop Id(25,1)
+2025-10-22T15:45:04.992075Z TRACE wgpu_core::resource: Destroy raw Sampler with 'SSR depth nearest sampler' label
+2025-10-22T15:45:04.992157Z TRACE wgpu_core::device::global: Buffer::drop Id(27,1)
+2025-10-22T15:45:04.992224Z TRACE wgpu_core::device::global: Sampler::drop Id(24,1)
+2025-10-22T15:45:04.992283Z TRACE wgpu_core::resource: Destroy raw Sampler with '' label
+2025-10-22T15:45:04.992356Z TRACE wgpu_core::device::global: TextureView::drop Id(10,1)
+2025-10-22T15:45:04.992407Z TRACE wgpu_core::resource: Destroy raw TextureView with 'depth pyramid dummy texture view' label
+2025-10-22T15:45:04.992462Z TRACE wgpu_core::device::global: Texture::drop Id(10,1)
+2025-10-22T15:45:04.992514Z TRACE wgpu_core::resource: Destroy raw Texture with 'depth pyramid dummy texture' label
+2025-10-22T15:45:04.992577Z TRACE wgpu_core::device::global: Sampler::drop Id(18,1)
+2025-10-22T15:45:04.992631Z TRACE wgpu_core::resource: Destroy raw Sampler with 'generator_linear_sampler' label
+2025-10-22T15:45:04.992689Z TRACE wgpu_core::device::global: Buffer::drop Id(3,1)
+2025-10-22T15:45:04.992741Z TRACE wgpu_core::device::global: Buffer::drop Id(4,1)
+2025-10-22T15:45:04.992799Z TRACE wgpu_core::device::global: Sampler::drop Id(19,1)
+2025-10-22T15:45:04.992847Z TRACE wgpu_core::resource: Destroy raw Sampler with '' label
+2025-10-22T15:45:04.992904Z TRACE wgpu_core::device::global: Sampler::drop Id(22,1)
+2025-10-22T15:45:04.992951Z TRACE wgpu_core::resource: Destroy raw Sampler with '' label
+2025-10-22T15:45:04.993026Z TRACE wgpu_core::device::global: Sampler::drop Id(8,1)
+2025-10-22T15:45:04.993079Z TRACE wgpu_core::resource: Destroy raw Sampler with 'fallback filtering sampler' label
+2025-10-22T15:45:04.993130Z TRACE wgpu_core::device::global: Sampler::drop Id(14,1)
+2025-10-22T15:45:04.993177Z TRACE wgpu_core::resource: Destroy raw Sampler with 'fallback non-filtering sampler' label
+2025-10-22T15:45:04.993229Z TRACE wgpu_core::device::global: Sampler::drop Id(21,1)
+2025-10-22T15:45:04.993276Z TRACE wgpu_core::resource: Destroy raw Sampler with 'fallback comparison sampler' label
+2025-10-22T15:45:04.993356Z TRACE wgpu_core::device::global: Sampler::drop Id(23,1)
+2025-10-22T15:45:04.993423Z TRACE wgpu_core::resource: Destroy raw Sampler with '' label
+2025-10-22T15:45:04.993493Z TRACE wgpu_core::device::global: Sampler::drop Id(26,1)
+2025-10-22T15:45:04.993553Z TRACE wgpu_core::resource: Destroy raw Sampler with '' label
+2025-10-22T15:45:04.993651Z TRACE wgpu_core::device::global: TextureView::drop Id(11,1)
+2025-10-22T15:45:04.993788Z TRACE wgpu_core::resource: Destroy raw TextureView with '' label
+2025-10-22T15:45:04.993857Z TRACE wgpu_core::device::global: Texture::drop Id(11,1)
+2025-10-22T15:45:04.993938Z TRACE wgpu_core::resource: Destroy raw Texture with '' label
+2025-10-22T15:45:04.994120Z TRACE wgpu_core::device::global: TextureView::drop Id(8,1)
+2025-10-22T15:45:04.994179Z TRACE wgpu_core::resource: Destroy raw TextureView with '' label
+2025-10-22T15:45:04.994267Z TRACE wgpu_core::device::global: Texture::drop Id(8,1)
+2025-10-22T15:45:04.994334Z TRACE wgpu_core::resource: Destroy raw Texture with '' label
+2025-10-22T15:45:04.994394Z TRACE wgpu_core::device::global: Sampler::drop Id(0,1)
+2025-10-22T15:45:04.994445Z TRACE wgpu_core::resource: Destroy raw Sampler with '' label
+2025-10-22T15:45:04.994520Z TRACE wgpu_core::device::global: BindGroup::drop Id(27,7)
+2025-10-22T15:45:04.994582Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'prepass_view_motion_vectors_bind_group' label
+2025-10-22T15:45:04.994650Z TRACE wgpu_core::binding_model: Destroy raw BindGroupLayout with 'prepass_view_layout_motion_vectors' label
+2025-10-22T15:45:04.994759Z TRACE wgpu_core::device::global: BindGroup::drop Id(67,5)
+2025-10-22T15:45:04.994815Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'prepass_view_no_motion_vectors_bind_group' label
+2025-10-22T15:45:04.994875Z TRACE wgpu_core::binding_model: Destroy raw BindGroupLayout with 'prepass_view_layout_no_motion_vectors' label
+2025-10-22T15:45:04.994936Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:04.994992Z TRACE wgpu_core::device::global: BindGroup::drop Id(0,1)
+2025-10-22T15:45:04.995041Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'prepass_view_empty_bind_group' label
+2025-10-22T15:45:04.995117Z TRACE wgpu_core::device::global: Sampler::drop Id(30,1)
+2025-10-22T15:45:04.995166Z TRACE wgpu_core::resource: Destroy raw Sampler with 'depth pyramid sampler' label
+2025-10-22T15:45:04.995228Z TRACE wgpu_core::device::global: BindGroup::drop Id(44,6)
+2025-10-22T15:45:04.995277Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'model_only_mesh_bind_group' label
+2025-10-22T15:45:04.995333Z TRACE wgpu_core::device::global: BindGroup::drop Id(5,472)
+2025-10-22T15:45:04.995382Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'skinned_motion_mesh_bind_group' label
+2025-10-22T15:45:04.995458Z TRACE wgpu_core::device::global: BindGroup::drop Id(38,7)
+2025-10-22T15:45:04.995527Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'skinned_mesh_bind_group' label
+2025-10-22T15:45:04.995595Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:04.995665Z TRACE wgpu_core::device::global: BindGroup::drop Id(56,6)
+2025-10-22T15:45:04.995716Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'model_only_mesh_bind_group' label
+2025-10-22T15:45:04.995777Z TRACE wgpu_core::device::global: BindGroup::drop Id(70,5)
+2025-10-22T15:45:04.995836Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'skinned_motion_mesh_bind_group' label
+2025-10-22T15:45:04.995892Z TRACE wgpu_core::device::global: BindGroup::drop Id(2,493)
+2025-10-22T15:45:04.995942Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'skinned_mesh_bind_group' label
+2025-10-22T15:45:04.995996Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:04.996072Z TRACE wgpu_core::device::global: BindGroup::drop Id(55,7)
+2025-10-22T15:45:04.996133Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'model_only_mesh_bind_group' label
+2025-10-22T15:45:04.996198Z TRACE wgpu_core::binding_model: Destroy raw BindGroupLayout with 'mesh_layout' label
+2025-10-22T15:45:04.996261Z TRACE wgpu_core::device::global: BindGroup::drop Id(69,5)
+2025-10-22T15:45:04.996312Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'skinned_motion_mesh_bind_group' label
+2025-10-22T15:45:04.996379Z TRACE wgpu_core::binding_model: Destroy raw BindGroupLayout with 'skinned_motion_mesh_layout' label
+2025-10-22T15:45:04.996440Z TRACE wgpu_core::resource: Destroy raw Buffer with 'skin uniform buffer' label
+2025-10-22T15:45:04.996501Z TRACE wgpu_core::device::global: BindGroup::drop Id(22,6)
+2025-10-22T15:45:04.996580Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'skinned_mesh_bind_group' label
+2025-10-22T15:45:04.996659Z TRACE wgpu_core::binding_model: Destroy raw BindGroupLayout with 'skinned_mesh_layout' label
+2025-10-22T15:45:04.996755Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:04.996818Z TRACE wgpu_core::resource: Destroy raw Buffer with 'skin uniform buffer' label
+2025-10-22T15:45:04.996893Z TRACE wgpu_core::device::global: BindGroup::drop Id(7,7)
+2025-10-22T15:45:04.997003Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'oit_resolve_bind_group' label
+2025-10-22T15:45:04.997081Z TRACE wgpu_core::binding_model: Destroy raw BindGroupLayout with 'oit_resolve_bind_group_layout' label
+2025-10-22T15:45:04.997156Z TRACE wgpu_core::resource: Destroy raw Buffer with 'oit_layers' label
+2025-10-22T15:45:04.997232Z TRACE wgpu_core::resource: Destroy raw Buffer with 'oit_layer_ids' label
+2025-10-22T15:45:04.997313Z TRACE wgpu_core::device::global: BindGroup::drop Id(35,6)
+2025-10-22T15:45:04.997368Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'LineGizmoUniform bindgroup' label
+2025-10-22T15:45:04.997438Z TRACE wgpu_core::binding_model: Destroy raw BindGroupLayout with 'LineGizmoUniform layout' label
+2025-10-22T15:45:04.997518Z TRACE wgpu_core::device::global: BindGroup::drop Id(52,7)
+2025-10-22T15:45:04.997591Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'reset_indexed_indirect_batch_sets_bind_group' label
+2025-10-22T15:45:04.997661Z TRACE wgpu_core::device::global: BindGroup::drop Id(66,5)
+2025-10-22T15:45:04.997723Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'build_indexed_indirect_parameters_bind_group' label
+2025-10-22T15:45:04.997793Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:04.997852Z TRACE wgpu_core::device::global: BindGroup::drop Id(4,502)
+2025-10-22T15:45:04.997901Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'reset_indexed_indirect_batch_sets_bind_group' label
+2025-10-22T15:45:04.997974Z TRACE wgpu_core::device::global: BindGroup::drop Id(30,6)
+2025-10-22T15:45:04.998035Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'build_indexed_indirect_parameters_bind_group' label
+2025-10-22T15:45:04.998105Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:04.998201Z TRACE wgpu_core::device::global: BindGroup::drop Id(53,6)
+2025-10-22T15:45:04.998250Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'reset_indexed_indirect_batch_sets_bind_group' label
+2025-10-22T15:45:04.998303Z TRACE wgpu_core::binding_model: Destroy raw BindGroupLayout with 'reset indirect batch sets bind group layout' label
+2025-10-22T15:45:04.998366Z TRACE wgpu_core::device::global: BindGroup::drop Id(59,7)
+2025-10-22T15:45:04.998415Z TRACE wgpu_core::binding_model: Destroy raw BindGroup with 'build_indexed_indirect_parameters_bind_group' label
+2025-10-22T15:45:04.998467Z TRACE wgpu_core::binding_model: Destroy raw BindGroupLayout with 'build indexed indirect parameters bind group layout' label
+2025-10-22T15:45:04.998542Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:05.007309Z TRACE wgpu_core::device::global: Device::drop Id(0,1)
+2025-10-22T15:45:05.007441Z TRACE wgpu_core::device::global: Queue::drop Id(0,1)
+2025-10-22T15:45:05.007497Z TRACE wgpu_core::device::queue: Drop Queue with '' label
+2025-10-22T15:45:05.007551Z TRACE wgpu_core::device::queue: Waiting on last submission. try: 1/6. timeout: 100ms
+2025-10-22T15:45:05.007670Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:05.007750Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:05.007846Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:05.007901Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:05.007952Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:05.008007Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:05.008061Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:05.008115Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:05.008224Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:05.008302Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:05.008376Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:05.008436Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:05.008500Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:05.008566Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:05.008641Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:05.008694Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:05.008777Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:05.008843Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:05.008900Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:05.008962Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:05.009020Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:05.009072Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:05.009123Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:05.009174Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:05.009228Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:05.009279Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:05.009342Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:05.009403Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:05.009457Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:05.009511Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:05.009567Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:05.009623Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:05.009677Z TRACE wgpu_core::resource: Destroy raw StagingBuffer
+2025-10-22T15:45:05.009762Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:05.009834Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:05.009902Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:05.009961Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:05.010022Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:05.010094Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:05.010165Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:05.010241Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:05.010345Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:05.010424Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:05.010507Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:05.010578Z TRACE wgpu_core::resource: Destroy raw Buffer with 'view_uniforms_buffer' label
+2025-10-22T15:45:05.010646Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:05.010713Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:05.010784Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:05.010853Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:05.010927Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:05.010995Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:05.011056Z TRACE wgpu_core::resource: Destroy raw Buffer with 'LineGizmo Strip Position Buffer' label
+2025-10-22T15:45:05.011112Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:05.011170Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:05.011225Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:05.011281Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:05.011348Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:05.011402Z TRACE wgpu_core::resource: Destroy raw Buffer with 'LineGizmo Strip Color Buffer' label
+2025-10-22T15:45:05.011459Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:05.011521Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:05.011580Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:05.011633Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:05.011687Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:05.011742Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:05.011796Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:05.011877Z TRACE wgpu_core::resource: Destroy raw Texture with '' label
+2025-10-22T15:45:05.011981Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:05.012035Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:05.012091Z TRACE wgpu_core::resource: Destroy raw Buffer with '' label
+2025-10-22T15:45:05.012156Z TRACE wgpu_core::resource: Destroy raw TextureView with '' label
+2025-10-22T15:45:05.012244Z TRACE wgpu_core::resource: Destroy raw TextureView with 'directional_light_shadow_map_array_texture_view' label
+2025-10-22T15:45:05.012316Z TRACE wgpu_core::resource: Destroy raw TextureView with 'directional_light_shadow_map_array_texture_view' label
+2025-10-22T15:45:05.012397Z TRACE wgpu_core::resource: Destroy raw TextureView with 'directional_light_shadow_map_array_texture_view' label
+2025-10-22T15:45:05.012472Z TRACE wgpu_core::resource: Destroy raw TextureView with 'directional_light_shadow_map_array_texture_view' label
+2025-10-22T15:45:05.012535Z TRACE wgpu_core::resource: Destroy raw Texture with 'directional_light_shadow_map_texture' label
+2025-10-22T15:45:05.013084Z TRACE wgpu_core::resource: Destroy raw TextureView with '' label
+2025-10-22T15:45:05.013158Z TRACE wgpu_core::resource: Destroy raw Texture with 'view_depth_texture' label
+2025-10-22T15:45:05.013478Z TRACE wgpu_core::resource: Destroy raw TextureView with '' label
+2025-10-22T15:45:05.013543Z TRACE wgpu_core::resource: Destroy raw Texture with 'main_texture_sampled' label
+2025-10-22T15:45:05.014193Z TRACE wgpu_core::resource: Destroy raw TextureView with '' label
+2025-10-22T15:45:05.014262Z TRACE wgpu_core::resource: Destroy raw Texture with 'main_texture_a' label
+2025-10-22T15:45:05.014699Z TRACE wgpu_core::instance: Adapter::drop Id(0,1)
+PS C:\Users\ilset\OneDrive\Bureaublad\Projecten\Rust+bevy\project_rts\project-RTS> 

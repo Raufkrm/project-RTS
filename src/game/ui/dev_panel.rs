@@ -1,911 +1,1138 @@
+use std::fmt::Write as _;
+
+use bevy::input::mouse::MouseButton;
+use bevy::log::{info, warn};
+use bevy::prelude::*;
+use bevy::ui::RelativeCursorPosition;
+
+use crate::app::AppState;
 use crate::game::world::planet::{
-    spawn_random_planet_inner, PlanetParams, PlanetSettings, PlanetTag,
+    analyze_planet_climate, apply_guardrail_adjustment, guardrail_adjustment_from_summaries,
+    guardrail_adjustment_from_summary, log_planet_configuration, spawn_random_planet_inner,
+    GuardrailAdjustment, PlanetClimateSummary, PlanetDebugConfig, PlanetParams, PlanetSettings,
+    PlanetSurfaceMaterial, PlanetTag,
 };
 use crate::game::world::sampling::FlatSamplerRes;
 use crate::game::world::terrain::{MapRoot, MapSettings};
-use bevy::asset::RenderAssetUsages;
-use bevy::ecs::relationship::RelatedSpawnerCommands;
-use bevy::prelude::ChildOf;
-use bevy::prelude::*;
-use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
-use bevy::ui::widget::ImageNode;
 
-// ----------------- Plugin -----------------
 pub struct DevPanelPlugin;
+
 impl Plugin for DevPanelPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<DevUiState>()
-            .init_resource::<crate::game::world::planet::PlanetParams>()
-            .init_resource::<crate::game::world::planet::PlanetSettings>()
+        app.init_resource::<DevPanelState>()
+            .init_resource::<PlanetSettings>()
+            .add_systems(
+                OnEnter(AppState::InGame),
+                (cleanup_panel, spawn_dev_panel).chain(),
+            )
+            .add_systems(OnExit(AppState::InGame), cleanup_panel)
             .add_systems(
                 Update,
-                (toggle_panel, update_panel_texts, panel_buttons, hotkeys)
-                    .run_if(in_state(crate::app::AppState::InGame)),
+                (
+                    toggle_panel_visibility,
+                    update_fps_display,
+                    handle_reroll_button,
+                    slider_input_system,
+                    numeric_input_interactions,
+                    numeric_input_editing,
+                    update_value_texts,
+                    update_slider_handles,
+                    update_input_highlights,
+                    apply_changes,
+                )
+                    .run_if(in_state(AppState::InGame)),
             );
+        app.add_systems(
+            Update,
+            handle_seed_sweep_button.run_if(in_state(AppState::InGame)),
+        );
     }
 }
 
-// ----------------- State -----------------
-#[derive(Resource)]
-struct DevUiState {
+#[derive(Resource, Default)]
+struct DevPanelState {
     open: bool,
     fps_smooth: f32,
+
+    seed: u64,
+    water_level: f32,
+    radius: f32,
+    height_amp: f32,
+    base_freq: f32,
+    detail_freq: f32,
+    warp_freq: f32,
+    warp_amp: f32,
+    mountain_strength: f32,
+    rotation_deg: f32,
+
+    dirty: bool,
+    active_slider: Option<ParameterKind>,
+    active_input: Option<ActiveInput>,
 }
-impl Default for DevUiState {
-    fn default() -> Self {
-        Self {
-            open: true,
-            fps_smooth: 0.0,
+
+struct ActiveInput {
+    entity: Entity,
+    kind: InputKind,
+    buffer: String,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum InputKind {
+    Seed,
+    Parameter(ParameterKind),
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+enum ParameterKind {
+    WaterLevel,
+    Radius,
+    HeightAmp,
+    BaseFreq,
+    DetailFreq,
+    WarpFreq,
+    WarpAmp,
+    Mountains,
+    Rotation,
+}
+
+#[derive(Clone, Copy)]
+struct ParameterDescriptor {
+    kind: ParameterKind,
+    label: &'static str,
+    min: f32,
+    max: f32,
+    log_scale: bool,
+    precision: usize,
+}
+
+impl ParameterDescriptor {
+    fn clamp(&self, value: f32) -> f32 {
+        value.clamp(self.min, self.max)
+    }
+
+    fn factor_from_value(&self, value: f32) -> f32 {
+        let clamped = self.clamp(value.max(1e-6));
+        if self.log_scale {
+            let log_min = self.min.max(1e-6).ln();
+            let log_max = self.max.max(self.min + 1e-6).ln();
+            let log_val = clamped.max(1e-6).ln();
+            ((log_val - log_min) / (log_max - log_min)).clamp(0.0, 1.0)
+        } else {
+            ((clamped - self.min) / (self.max - self.min)).clamp(0.0, 1.0)
         }
     }
+
+    fn value_from_factor(&self, factor: f32) -> f32 {
+        let t = factor.clamp(0.0, 1.0);
+        if self.log_scale {
+            let log_min = self.min.max(1e-6).ln();
+            let log_max = self.max.max(self.min + 1e-6).ln();
+            (log_min + (log_max - log_min) * t).exp()
+        } else {
+            self.min + (self.max - self.min) * t
+        }
+    }
+
+    fn format_value(&self, value: f32) -> String {
+        let mut buffer = String::new();
+        let _ = match self.precision {
+            0 => write!(buffer, "{:.0}", value),
+            1 => write!(buffer, "{:.1}", value),
+            2 => write!(buffer, "{:.2}", value),
+            3 => write!(buffer, "{:.3}", value),
+            _ => write!(buffer, "{:.4}", value),
+        };
+        buffer
+    }
+}
+
+const PARAM_DESCRIPTORS: [ParameterDescriptor; 9] = [
+    ParameterDescriptor {
+        kind: ParameterKind::WaterLevel,
+        label: "Water Level",
+        min: 0.0,
+        max: 1.0,
+        log_scale: false,
+        precision: 2,
+    },
+    ParameterDescriptor {
+        kind: ParameterKind::Radius,
+        label: "Radius",
+        min: 100.0,
+        max: 2_000_000.0,
+        log_scale: true,
+        precision: 0,
+    },
+    ParameterDescriptor {
+        kind: ParameterKind::HeightAmp,
+        label: "Height Amp",
+        min: 10.0,
+        max: 20_000.0,
+        log_scale: true,
+        precision: 1,
+    },
+    ParameterDescriptor {
+        kind: ParameterKind::BaseFreq,
+        label: "Base Freq",
+        min: 0.05,
+        max: 5.0,
+        log_scale: true,
+        precision: 2,
+    },
+    ParameterDescriptor {
+        kind: ParameterKind::DetailFreq,
+        label: "Detail Freq",
+        min: 0.1,
+        max: 12.0,
+        log_scale: true,
+        precision: 2,
+    },
+    ParameterDescriptor {
+        kind: ParameterKind::WarpFreq,
+        label: "Warp Freq",
+        min: 0.1,
+        max: 6.0,
+        log_scale: true,
+        precision: 2,
+    },
+    ParameterDescriptor {
+        kind: ParameterKind::WarpAmp,
+        label: "Warp Amp",
+        min: 0.0,
+        max: 0.4,
+        log_scale: false,
+        precision: 3,
+    },
+    ParameterDescriptor {
+        kind: ParameterKind::Mountains,
+        label: "Mountains",
+        min: 0.0,
+        max: 1.0,
+        log_scale: false,
+        precision: 2,
+    },
+    ParameterDescriptor {
+        kind: ParameterKind::Rotation,
+        label: "Rotation (deg)",
+        min: -180.0,
+        max: 180.0,
+        log_scale: false,
+        precision: 1,
+    },
+];
+
+const SEED_SWEEP_COUNT: u32 = 24;
+const PANEL_WIDTH: f32 = 320.0;
+const SLIDER_WIDTH: f32 = 180.0;
+const SLIDER_HEIGHT: f32 = 6.0;
+const HANDLE_WIDTH: f32 = 12.0;
+const AUTOBALANCE_SWEEP_COUNT: u32 = 6;
+const DIGIT_KEYS: &[(KeyCode, char)] = &[
+    (KeyCode::Digit0, '0'),
+    (KeyCode::Digit1, '1'),
+    (KeyCode::Digit2, '2'),
+    (KeyCode::Digit3, '3'),
+    (KeyCode::Digit4, '4'),
+    (KeyCode::Digit5, '5'),
+    (KeyCode::Digit6, '6'),
+    (KeyCode::Digit7, '7'),
+    (KeyCode::Digit8, '8'),
+    (KeyCode::Digit9, '9'),
+    (KeyCode::Numpad0, '0'),
+    (KeyCode::Numpad1, '1'),
+    (KeyCode::Numpad2, '2'),
+    (KeyCode::Numpad3, '3'),
+    (KeyCode::Numpad4, '4'),
+    (KeyCode::Numpad5, '5'),
+    (KeyCode::Numpad6, '6'),
+    (KeyCode::Numpad7, '7'),
+    (KeyCode::Numpad8, '8'),
+    (KeyCode::Numpad9, '9'),
+];
+
+#[inline]
+fn resource_angle_from_slider(deg: f32) -> f32 {
+    deg.rem_euclid(360.0)
+}
+
+#[inline]
+fn slider_angle_from_resource(deg: f32) -> f32 {
+    ((deg + 180.0).rem_euclid(360.0)) - 180.0
 }
 
 #[derive(Component)]
 struct DevPanelRoot;
+
 #[derive(Component)]
 struct FpsText;
+
+#[derive(Component)]
+struct SeedInput;
+
 #[derive(Component)]
 struct SeedText;
-#[derive(Component)]
-struct InfoText;
-
-// Per-setting readouts
-#[derive(Component)]
-struct RadiusText;
-#[derive(Component)]
-struct HeightAmpText;
-#[derive(Component)]
-struct BaseFreqText;
-#[derive(Component)]
-struct DetailFreqText;
-#[derive(Component)]
-struct WarpFreqText;
-#[derive(Component)]
-struct WarpAmpText;
-#[derive(Component)]
-struct MountainsText;
 
 #[derive(Component)]
-struct DevMapRoot; // top-right preview container
+struct RerollButton;
 #[derive(Component)]
-struct HeightmapWidget; // image inside it
+struct SeedSweepButton;
 
-#[derive(Component, Clone, Copy)]
-enum ButtonKind {
-    // map / seed / water
-    Reroll,
-    WaterMinus,
-    WaterPlus,
-
-    // planet params
-    RadiusMinus,
-    RadiusPlus,
-    HeightMinus,
-    HeightPlus,
-
-    // planet settings
-    BaseFreqMinus,
-    BaseFreqPlus,
-    DetailFreqMinus,
-    DetailFreqPlus,
-    WarpFreqMinus,
-    WarpFreqPlus,
-    WarpAmpMinus,
-    WarpAmpPlus,
-    MountainsMinus,
-    MountainsPlus,
+#[derive(Component)]
+struct ParameterSlider {
+    descriptor: ParameterDescriptor,
 }
 
-// ----------------- UI helpers -----------------
-fn row_label_value(
-    c: &mut RelatedSpawnerCommands<'_, ChildOf>,
-    font: &Handle<Font>,
-    label: &str,
-    value_comp: impl Component,
-) {
-    c.spawn((Node {
-        display: Display::Flex,
-        justify_content: JustifyContent::SpaceBetween,
-        align_items: AlignItems::Center,
-        ..default()
-    },))
-        .with_children(|r| {
-            r.spawn((
-                Text::new(label),
-                TextFont {
-                    font: font.clone(),
-                    font_size: 14.0,
-                    ..default()
-                },
-                TextColor(Color::srgb(0.85, 0.85, 0.85)),
-            ));
-            r.spawn((
-                value_comp,
-                Text::new("..."),
-                TextFont {
-                    font: font.clone(),
-                    font_size: 14.0,
-                    ..default()
-                },
-                TextColor(Color::srgb(0.9, 0.9, 0.9)),
-            ));
-        });
+#[derive(Component)]
+struct SliderHandle;
+
+#[derive(Component)]
+struct ParameterValueText {
+    descriptor: ParameterDescriptor,
 }
 
-fn row_buttons(
-    c: &mut RelatedSpawnerCommands<'_, ChildOf>,
-    font: &Handle<Font>,
-    left: ButtonKind,
-    right: ButtonKind,
-) {
-    c.spawn((Node {
-        display: Display::Flex,
-        column_gap: Val::Px(6.0),
-        ..default()
-    },))
-        .with_children(|row| {
-            row.spawn((
-                left,
-                Button,
-                Node {
-                    padding: UiRect::axes(Val::Px(10.0), Val::Px(6.0)),
-                    ..default()
-                },
-                BackgroundColor(Color::srgb(0.95, 0.82, 0.10)),
-                BorderColor::all(Color::BLACK),
-            ))
-            .with_children(|b| {
-                b.spawn((
-                    Text::new("−"),
-                    TextFont {
-                        font: font.clone(),
-                        font_size: 14.0,
-                        ..default()
-                    },
-                    TextColor(Color::BLACK),
-                ));
-            });
-
-            row.spawn((
-                right,
-                Button,
-                Node {
-                    padding: UiRect::axes(Val::Px(10.0), Val::Px(6.0)),
-                    ..default()
-                },
-                BackgroundColor(Color::srgb(0.95, 0.82, 0.10)),
-                BorderColor::all(Color::BLACK),
-            ))
-            .with_children(|b| {
-                b.spawn((
-                    Text::new("+"),
-                    TextFont {
-                        font: font.clone(),
-                        font_size: 14.0,
-                        ..default()
-                    },
-                    TextColor(Color::BLACK),
-                ));
-            });
-        });
+#[derive(Component)]
+struct ParameterInput {
+    descriptor: ParameterDescriptor,
 }
 
-// ----------------- Systems -----------------
-fn toggle_panel(
+fn descriptor_for(kind: ParameterKind) -> ParameterDescriptor {
+    PARAM_DESCRIPTORS
+        .iter()
+        .copied()
+        .find(|d| d.kind == kind)
+        .expect("descriptor missing")
+}
+
+fn cleanup_panel(
     mut commands: Commands,
-    keys: Res<ButtonInput<KeyCode>>,
-    mut ui: ResMut<DevUiState>,
-    assets: Res<AssetServer>,
-    root_q: Query<Entity, With<DevPanelRoot>>,
+    roots: Query<Entity, With<DevPanelRoot>>,
     children_q: Query<&Children>,
-
-    // heightmap preview
-    mut images: ResMut<Assets<Image>>,
-    map: Res<MapSettings>,
-    map_root_q: Query<Entity, With<DevMapRoot>>,
 ) {
-    if keys.just_pressed(KeyCode::F1) {
-        ui.open = !ui.open;
+    for entity in roots.iter() {
+        despawn_children_recursive(&mut commands, entity, &children_q);
     }
+}
 
-    if ui.open {
-        // left dev panel
-        if root_q.is_empty() {
-            let font: Handle<Font> = assets.load("fonts/arial.ttf");
+fn spawn_dev_panel(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut state: ResMut<DevPanelState>,
+    map: Res<MapSettings>,
+    params: Res<PlanetParams>,
+    settings: Res<PlanetSettings>,
+) {
+    state.open = true;
+    state.active_input = None;
+    state.active_slider = None;
+    state.dirty = false;
+    state.fps_smooth = 0.0;
 
-            commands
+    state.seed = map.seed;
+    state.water_level = map.water_level;
+    state.radius = params.radius;
+    state.height_amp = params.height_amp;
+    state.base_freq = settings.base_freq;
+    state.detail_freq = settings.detail_freq;
+    state.warp_freq = settings.warp_freq;
+    state.warp_amp = settings.warp_amp;
+    state.mountain_strength = settings.mountain_strength;
+    state.rotation_deg = slider_angle_from_resource(params.rotation_deg);
+
+    let font = asset_server.load("fonts/arial.ttf");
+
+    commands
+        .spawn((
+            DevPanelRoot,
+            Node {
+                width: Val::Px(PANEL_WIDTH),
+                flex_direction: FlexDirection::Column,
+                padding: UiRect::all(Val::Px(16.0)),
+                row_gap: Val::Px(12.0),
+                position_type: PositionType::Absolute,
+                top: Val::Px(20.0),
+                left: Val::Px(20.0),
+                ..default()
+            },
+            BackgroundColor(Color::srgba(0.05, 0.05, 0.08, 0.92)),
+            BorderColor::all(Color::srgba(0.3, 0.3, 0.45, 1.0)),
+            Name::new("DevPanel"),
+        ))
+        .with_children(|panel| {
+            panel.spawn((
+                Text::new("DEV PANEL"),
+                TextFont {
+                    font: font.clone(),
+                    font_size: 20.0,
+                    ..default()
+                },
+                TextColor(Color::srgba(1.0, 1.0, 1.0, 1.0)),
+            ));
+
+            panel.spawn((
+                Text::new("FPS: --"),
+                TextFont {
+                    font: font.clone(),
+                    font_size: 16.0,
+                    ..default()
+                },
+                TextColor(Color::srgba(0.9, 0.9, 0.9, 1.0)),
+                FpsText,
+            ));
+
+            panel
                 .spawn((
-                    DevPanelRoot,
                     Node {
-                        width: Val::Px(360.0),
-                        height: Val::Auto,
-                        display: Display::Flex,
-                        flex_direction: FlexDirection::Column,
-                        row_gap: Val::Px(8.0),
-                        padding: UiRect::all(Val::Px(10.0)),
-                        position_type: PositionType::Absolute,
-                        top: Val::Px(12.0),
-                        left: Val::Px(12.0),
+                        flex_direction: FlexDirection::Row,
+                        align_items: AlignItems::Center,
+                        column_gap: Val::Px(10.0),
                         ..default()
                     },
-                    BackgroundColor(Color::srgba(0.05, 0.05, 0.06, 0.85)),
+                    Name::new("SeedRow"),
                 ))
-                .with_children(|c| {
-                    // Title + basics
-                    c.spawn((
-                        Text::new("DEV PANEL"),
+                .with_children(|row| {
+                    row.spawn((
+                        Text::new("Seed"),
                         TextFont {
                             font: font.clone(),
                             font_size: 16.0,
                             ..default()
                         },
-                        TextColor(Color::srgb(1.0, 1.0, 1.0)),
+                        TextColor(Color::srgba(0.9, 0.9, 0.9, 1.0)),
                     ));
-                    c.spawn((
-                        FpsText,
-                        Text::new("FPS: ..."),
-                        TextFont {
-                            font: font.clone(),
-                            font_size: 14.0,
+
+                    row.spawn((
+                        SeedInput,
+                        Button,
+                        Interaction::default(),
+                        Node {
+                            width: Val::Px(120.0),
+                            height: Val::Px(26.0),
+                            align_items: AlignItems::Center,
+                            justify_content: JustifyContent::Start,
+                            padding: UiRect::horizontal(Val::Px(8.0)),
                             ..default()
                         },
-                        TextColor(Color::srgb(0.8, 0.8, 0.8)),
-                    ));
-                    c.spawn((
-                        SeedText,
-                        Text::new("Seed: ..."),
-                        TextFont {
-                            font: font.clone(),
-                            font_size: 14.0,
+                        BackgroundColor(Color::srgba(0.16, 0.16, 0.22, 1.0)),
+                        BorderColor::all(Color::srgba(0.55, 0.55, 0.75, 1.0)),
+                        Name::new("SeedInput"),
+                    ))
+                    .with_children(|input| {
+                        input.spawn((
+                            SeedText,
+                            Text::new(map.seed.to_string()),
+                            TextFont {
+                                font: font.clone(),
+                                font_size: 16.0,
+                                ..default()
+                            },
+                            TextColor(Color::srgba(0.95, 0.95, 0.95, 1.0)),
+                        ));
+                    });
+
+                    row.spawn((
+                        RerollButton,
+                        Button,
+                        Interaction::default(),
+                        Node {
+                            padding: UiRect::axes(Val::Px(12.0), Val::Px(6.0)),
                             ..default()
                         },
-                        TextColor(Color::srgb(0.8, 0.8, 0.8)),
-                    ));
-                    c.spawn((
-                        InfoText,
-                        Text::new("Size: ...   Water: ..."),
-                        TextFont {
-                            font: font.clone(),
-                            font_size: 14.0,
+                        BackgroundColor(Color::srgba(0.85, 0.65, 0.1, 1.0)),
+                        BorderColor::all(Color::srgba(1.0, 0.85, 0.25, 1.0)),
+                        Name::new("RerollButton"),
+                    ))
+                    .with_children(|button| {
+                        button.spawn((
+                            Text::new("Reroll"),
+                            TextFont {
+                                font: font.clone(),
+                                font_size: 16.0,
+                                ..default()
+                            },
+                            TextColor(Color::srgba(0.1, 0.1, 0.15, 1.0)),
+                        ));
+                    });
+
+                    row.spawn((
+                        SeedSweepButton,
+                        Button,
+                        Interaction::default(),
+                        Node {
+                            padding: UiRect::axes(Val::Px(10.0), Val::Px(6.0)),
                             ..default()
                         },
-                        TextColor(Color::srgb(0.8, 0.8, 0.8)),
-                    ));
-
-                    // Buttons row (seed/water)
-                    c.spawn((Node {
-                        display: Display::Flex,
-                        column_gap: Val::Px(8.0),
-                        ..default()
-                    },))
-                        .with_children(|row| {
-                            // Reroll
-                            row.spawn((
-                                ButtonKind::Reroll,
-                                Button,
-                                Node {
-                                    padding: UiRect::axes(Val::Px(10.0), Val::Px(6.0)),
-                                    ..default()
-                                },
-                                BackgroundColor(Color::srgb(0.95, 0.82, 0.10)),
-                                BorderColor::all(Color::BLACK),
-                            ))
-                            .with_children(|b| {
-                                b.spawn((
-                                    Text::new("Reroll [R]"),
-                                    TextFont {
-                                        font: font.clone(),
-                                        font_size: 14.0,
-                                        ..default()
-                                    },
-                                    TextColor(Color::BLACK),
-                                ));
-                            });
-
-                            // Water -
-                            row.spawn((
-                                ButtonKind::WaterMinus,
-                                Button,
-                                Node {
-                                    padding: UiRect::axes(Val::Px(10.0), Val::Px(6.0)),
-                                    ..default()
-                                },
-                                BackgroundColor(Color::srgb(0.95, 0.82, 0.10)),
-                                BorderColor::all(Color::BLACK),
-                            ))
-                            .with_children(|b| {
-                                b.spawn((
-                                    Text::new("Water -"),
-                                    TextFont {
-                                        font: font.clone(),
-                                        font_size: 14.0,
-                                        ..default()
-                                    },
-                                    TextColor(Color::BLACK),
-                                ));
-                            });
-
-                            // Water +
-                            row.spawn((
-                                ButtonKind::WaterPlus,
-                                Button,
-                                Node {
-                                    padding: UiRect::axes(Val::Px(10.0), Val::Px(6.0)),
-                                    ..default()
-                                },
-                                BackgroundColor(Color::srgb(0.95, 0.82, 0.10)),
-                                BorderColor::all(Color::BLACK),
-                            ))
-                            .with_children(|b| {
-                                b.spawn((
-                                    Text::new("Water +"),
-                                    TextFont {
-                                        font: font.clone(),
-                                        font_size: 14.0,
-                                        ..default()
-                                    },
-                                    TextColor(Color::BLACK),
-                                ));
-                            });
-                        });
-
-                    // ---- Planet knobs ----
-                    c.spawn((
-                        Text::new("PLANET"),
-                        TextFont {
-                            font: font.clone(),
-                            font_size: 15.0,
-                            ..default()
-                        },
-                        TextColor(Color::srgb(0.95, 0.95, 0.95)),
-                    ));
-
-                    // Radius
-                    row_label_value(c, &font, "Radius", RadiusText);
-                    row_buttons(c, &font, ButtonKind::RadiusMinus, ButtonKind::RadiusPlus);
-
-                    // Height Amp
-                    row_label_value(c, &font, "Height Amp", HeightAmpText);
-                    row_buttons(c, &font, ButtonKind::HeightMinus, ButtonKind::HeightPlus);
-
-                    // Base Freq
-                    row_label_value(c, &font, "Base Freq", BaseFreqText);
-                    row_buttons(
-                        c,
-                        &font,
-                        ButtonKind::BaseFreqMinus,
-                        ButtonKind::BaseFreqPlus,
-                    );
-
-                    // Detail Freq
-                    row_label_value(c, &font, "Detail Freq", DetailFreqText);
-                    row_buttons(
-                        c,
-                        &font,
-                        ButtonKind::DetailFreqMinus,
-                        ButtonKind::DetailFreqPlus,
-                    );
-
-                    // Warp Freq
-                    row_label_value(c, &font, "Warp Freq", WarpFreqText);
-                    row_buttons(
-                        c,
-                        &font,
-                        ButtonKind::WarpFreqMinus,
-                        ButtonKind::WarpFreqPlus,
-                    );
-
-                    // Warp Amp
-                    row_label_value(c, &font, "Warp Amp", WarpAmpText);
-                    row_buttons(c, &font, ButtonKind::WarpAmpMinus, ButtonKind::WarpAmpPlus);
-
-                    // Mountains
-                    row_label_value(c, &font, "Mountains", MountainsText);
-                    row_buttons(
-                        c,
-                        &font,
-                        ButtonKind::MountainsMinus,
-                        ButtonKind::MountainsPlus,
-                    );
+                        BackgroundColor(Color::srgba(0.25, 0.55, 0.95, 1.0)),
+                        BorderColor::all(Color::srgba(0.45, 0.75, 1.0, 1.0)),
+                        Name::new("SeedSweepButton"),
+                    ))
+                    .with_children(|button| {
+                        button.spawn((
+                            Text::new("Sweep ×24"),
+                            TextFont {
+                                font: font.clone(),
+                                font_size: 16.0,
+                                ..default()
+                            },
+                            TextColor(Color::srgba(0.06, 0.1, 0.18, 1.0)),
+                        ));
+                    });
                 });
-        }
 
-        // top-right heightmap preview box
-        if map_root_q.is_empty() {
-            spawn_heightmap_widget(&mut commands, &mut images, &map);
-        }
-    }
+            panel.spawn((
+                Node {
+                    width: Val::Percent(100.0),
+                    height: Val::Px(1.0),
+                    ..default()
+                },
+                BackgroundColor(Color::srgba(0.25, 0.25, 0.35, 0.9)),
+                Name::new("Divider"),
+            ));
 
-    // hide if closed
-    if !ui.open {
-        if let Some(e) = root_q.iter().next() {
-            despawn_recursive(&mut commands, e, &children_q);
-        }
-        if let Some(e) = map_root_q.iter().next() {
-            despawn_recursive(&mut commands, e, &children_q);
+            panel.spawn((
+                Text::new("PLANET"),
+                TextFont {
+                    font: font.clone(),
+                    font_size: 17.0,
+                    ..default()
+                },
+                TextColor(Color::srgba(0.95, 0.95, 0.95, 1.0)),
+            ));
+
+            for descriptor in PARAM_DESCRIPTORS.iter().copied() {
+                panel
+                    .spawn((
+                        Node {
+                            flex_direction: FlexDirection::Column,
+                            row_gap: Val::Px(6.0),
+                            ..default()
+                        },
+                        Name::new(format!("{} Row", descriptor.label)),
+                    ))
+                    .with_children(|row| {
+                        row.spawn((
+                            Text::new(descriptor.label),
+                            TextFont {
+                                font: font.clone(),
+                                font_size: 15.0,
+                                ..default()
+                            },
+                            TextColor(Color::srgba(0.92, 0.92, 0.96, 1.0)),
+                        ));
+
+                        row.spawn((
+                            Node {
+                                flex_direction: FlexDirection::Row,
+                                align_items: AlignItems::Center,
+                                column_gap: Val::Px(10.0),
+                                ..default()
+                            },
+                            Name::new(format!("{} Controls", descriptor.label)),
+                        ))
+                        .with_children(|controls| {
+                            controls
+                                .spawn((
+                                    ParameterSlider { descriptor },
+                                    RelativeCursorPosition::default(),
+                                    Interaction::default(),
+                                    Node {
+                                        width: Val::Px(SLIDER_WIDTH),
+                                        height: Val::Px(SLIDER_HEIGHT),
+                                        position_type: PositionType::Relative,
+                                        ..default()
+                                    },
+                                    BackgroundColor(Color::srgba(0.2, 0.2, 0.3, 1.0)),
+                                    BorderColor::all(Color::srgba(0.45, 0.45, 0.6, 1.0)),
+                                    Name::new(format!("{} Slider", descriptor.label)),
+                                ))
+                                .with_children(|track| {
+                                    track.spawn((
+                                        SliderHandle,
+                                        Node {
+                                            width: Val::Px(HANDLE_WIDTH),
+                                            height: Val::Px(HANDLE_WIDTH),
+                                            position_type: PositionType::Absolute,
+                                            top: Val::Px(-(HANDLE_WIDTH - SLIDER_HEIGHT) * 0.5),
+                                            left: Val::Px(0.0),
+                                            ..default()
+                                        },
+                                        BackgroundColor(Color::srgba(0.9, 0.7, 0.25, 1.0)),
+                                        BorderColor::all(Color::srgba(1.0, 0.9, 0.45, 1.0)),
+                                    ));
+                                });
+
+                            controls
+                                .spawn((
+                                    ParameterInput { descriptor },
+                                    Button,
+                                    Interaction::default(),
+                                    Node {
+                                        width: Val::Px(90.0),
+                                        height: Val::Px(26.0),
+                                        align_items: AlignItems::Center,
+                                        justify_content: JustifyContent::Start,
+                                        padding: UiRect::horizontal(Val::Px(8.0)),
+                                        ..default()
+                                    },
+                                    BackgroundColor(Color::srgba(0.13, 0.13, 0.19, 1.0)),
+                                    BorderColor::all(Color::srgba(0.5, 0.5, 0.7, 1.0)),
+                                    Name::new(format!("{} Input", descriptor.label)),
+                                ))
+                                .with_children(|input| {
+                                    input.spawn((
+                                        ParameterValueText { descriptor },
+                                        Text::new(descriptor.format_value(descriptor.min)),
+                                        TextFont {
+                                            font: font.clone(),
+                                            font_size: 15.0,
+                                            ..default()
+                                        },
+                                        TextColor(Color::srgba(0.95, 0.95, 0.95, 1.0)),
+                                    ));
+                                });
+                        });
+                    });
+            }
+        });
+}
+
+fn toggle_panel_visibility(
+    keys: Res<ButtonInput<KeyCode>>,
+    mut state: ResMut<DevPanelState>,
+    mut query: Query<&mut Node, With<DevPanelRoot>>,
+) {
+    if keys.just_pressed(KeyCode::F1) {
+        state.open = !state.open;
+        state.active_input = None;
+        state.active_slider = None;
+
+        if let Ok(mut node) = query.single_mut() {
+            node.display = if state.open {
+                Display::Flex
+            } else {
+                Display::None
+            };
         }
     }
 }
 
-use bevy::prelude::*;
-
-fn update_panel_texts(
+fn update_fps_display(
     time: Res<Time>,
-    mut ui: ResMut<DevUiState>,
-    map: Res<MapSettings>,
-    params: Option<Res<PlanetParams>>,
-    settings: Option<Res<PlanetSettings>>,
-
-    // One query, many optional tag markers -> no B0001
-    mut texts: Query<(
-        &mut Text,
-        Option<&FpsText>,
-        Option<&SeedText>,
-        Option<&InfoText>,
-        Option<&RadiusText>,
-        Option<&HeightAmpText>,
-        Option<&BaseFreqText>,
-        Option<&DetailFreqText>,
-        Option<&WarpFreqText>,
-        Option<&WarpAmpText>,
-        Option<&MountainsText>,
-    )>,
+    mut state: ResMut<DevPanelState>,
+    mut fps_text: Query<&mut Text, With<FpsText>>,
 ) {
-    // --- FPS smoothing ---
-    let dt = time.delta_secs().max(1e-6);
-    let instant = 1.0 / dt;
-    ui.fps_smooth = if ui.fps_smooth == 0.0 {
-        instant
-    } else {
-        ui.fps_smooth * 0.9 + instant * 0.1
-    };
-
-    // cache values we’ll write
-    let mut fps_txt: Option<String> = Some(format!("FPS: {:.1}", ui.fps_smooth));
-    let mut seed_txt: Option<String> = Some(format!("Seed: {}", map.seed));
-    let mut info_txt: Option<String> = Some(format!(
-        "Size: {}×{}   Water: {:.2}",
-        map.width, map.height, map.water_level
-    ));
-
-    let (radius_v, height_v, base_v, detail_v, wf_v, wa_v, m_v) =
-        if let (Some(p), Some(s)) = (params.as_deref(), settings.as_deref()) {
-            (
-                Some(format!("{:.2}", p.radius)),
-                Some(format!("{:.2}", p.height_amp)),
-                Some(format!("{:.2}", s.base_freq)),
-                Some(format!("{:.2}", s.detail_freq)),
-                Some(format!("{:.2}", s.warp_freq)),
-                Some(format!("{:.3}", s.warp_amp)),
-                Some(format!("{:.2}", s.mountain_strength)),
-            )
+    let dt = time.delta_secs();
+    if dt > 0.0 {
+        let fps = (1.0 / dt).clamp(0.0, 9999.0);
+        let alpha = 0.08;
+        state.fps_smooth = if state.fps_smooth <= 0.0 {
+            fps
         } else {
-            (None, None, None, None, None, None, None)
+            state.fps_smooth * (1.0 - alpha) + fps * alpha
         };
+    }
 
-    for (
-        mut text,
-        is_fps,
-        is_seed,
-        is_info,
-        is_radius,
-        is_height,
-        is_base,
-        is_detail,
-        is_wf,
-        is_wa,
-        is_m,
-    ) in &mut texts
-    {
-        if is_fps.is_some() {
-            if let Some(v) = fps_txt.take() {
-                text.0 = v;
-            }
-            continue;
-        }
-        if is_seed.is_some() {
-            if let Some(v) = seed_txt.take() {
-                text.0 = v;
-            }
-            continue;
-        }
-        if is_info.is_some() {
-            if let Some(v) = info_txt.take() {
-                text.0 = v;
-            }
-            continue;
-        }
+    if let Ok(mut text) = fps_text.single_mut() {
+        text.0 = format!("FPS: {:.1}", state.fps_smooth);
+    }
+}
 
-        if is_radius.is_some() {
-            if let Some(v) = &radius_v {
-                text.0 = v.clone();
+fn handle_reroll_button(
+    mut state: ResMut<DevPanelState>,
+    mut query: Query<
+        (&Interaction, &mut BackgroundColor),
+        (With<RerollButton>, Changed<Interaction>),
+    >,
+) {
+    for (interaction, mut color) in query.iter_mut() {
+        match *interaction {
+            Interaction::Pressed => {
+                *color = BackgroundColor(Color::srgba(1.0, 0.75, 0.25, 1.0));
+                state.seed = state.seed.wrapping_add(1);
+                state.dirty = true;
+                state.active_input = None;
             }
-            continue;
-        }
-        if is_height.is_some() {
-            if let Some(v) = &height_v {
-                text.0 = v.clone();
+            Interaction::Hovered => {
+                *color = BackgroundColor(Color::srgba(0.95, 0.7, 0.2, 1.0));
             }
-            continue;
-        }
-        if is_base.is_some() {
-            if let Some(v) = &base_v {
-                text.0 = v.clone();
+            Interaction::None => {
+                *color = BackgroundColor(Color::srgba(0.85, 0.65, 0.1, 1.0));
             }
-            continue;
-        }
-        if is_detail.is_some() {
-            if let Some(v) = &detail_v {
-                text.0 = v.clone();
-            }
-            continue;
-        }
-        if is_wf.is_some() {
-            if let Some(v) = &wf_v {
-                text.0 = v.clone();
-            }
-            continue;
-        }
-        if is_wa.is_some() {
-            if let Some(v) = &wa_v {
-                text.0 = v.clone();
-            }
-            continue;
-        }
-        if is_m.is_some() {
-            if let Some(v) = &m_v {
-                text.0 = v.clone();
-            }
-            continue;
         }
     }
 }
 
-// === Buttons / rebuild ===
-fn panel_buttons(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+fn handle_seed_sweep_button(
+    mut state: ResMut<DevPanelState>,
     mut map: ResMut<MapSettings>,
-
-    // planet resources
-    mut sampler: ResMut<FlatSamplerRes>,
-    mut planet: ResMut<PlanetParams>,
+    mut params: ResMut<PlanetParams>,
     mut settings: ResMut<PlanetSettings>,
-    planets: Query<Entity, With<PlanetTag>>,
-
-    mut q: Query<
-        (&Interaction, &mut BackgroundColor, &ButtonKind),
-        (Changed<Interaction>, With<Button>),
+    mut query: Query<
+        (&Interaction, &mut BackgroundColor),
+        (With<SeedSweepButton>, Changed<Interaction>),
     >,
-    roots: Query<Entity, With<MapRoot>>,
-    children_q: Query<&Children>,
-
-    // refresh heightmap preview:
-    mut images: ResMut<Assets<Image>>,
-    map_root_q: Query<Entity, With<DevMapRoot>>,
 ) {
-    let mut changed = false;
-
-    for (interaction, mut bg, kind) in &mut q {
+    for (interaction, mut color) in query.iter_mut() {
         match *interaction {
-            Interaction::Hovered => *bg = BackgroundColor(Color::srgb(1.0, 0.9, 0.2)),
-            Interaction::None => *bg = BackgroundColor(Color::srgb(0.95, 0.82, 0.10)),
             Interaction::Pressed => {
-                *bg = BackgroundColor(Color::srgb(0.9, 0.8, 0.1));
-                match *kind {
-                    // Seed / water
-                    ButtonKind::Reroll => {
-                        map.seed = map.seed.wrapping_add(1);
-                        changed = true;
-                    }
-                    ButtonKind::WaterMinus => {
-                        map.water_level = (map.water_level - 0.02).clamp(0.05, 0.95);
-                        changed = true;
-                    }
-                    ButtonKind::WaterPlus => {
-                        map.water_level = (map.water_level + 0.02).clamp(0.05, 0.95);
-                        changed = true;
-                    }
+                *color = BackgroundColor(Color::srgba(0.22, 0.48, 0.88, 1.0));
+                log_seed_sweep(
+                    state.seed,
+                    SEED_SWEEP_COUNT,
+                    &mut state,
+                    &mut map,
+                    &mut params,
+                    &mut settings,
+                );
+            }
+            Interaction::Hovered => {
+                *color = BackgroundColor(Color::srgba(0.28, 0.58, 0.95, 1.0));
+            }
+            Interaction::None => {
+                *color = BackgroundColor(Color::srgba(0.25, 0.55, 0.95, 1.0));
+            }
+        }
+    }
+}
 
-                    // Params
-                    ButtonKind::RadiusMinus => {
-                        planet.radius = (planet.radius - 0.2).max(1.0);
-                        changed = true;
-                    }
-                    ButtonKind::RadiusPlus => {
-                        planet.radius = (planet.radius + 0.2).min(50.0);
-                        changed = true;
-                    }
-                    ButtonKind::HeightMinus => {
-                        planet.height_amp = (planet.height_amp - 0.05).max(0.1);
-                        changed = true;
-                    }
-                    ButtonKind::HeightPlus => {
-                        planet.height_amp = (planet.height_amp + 0.05).min(10.0);
-                        changed = true;
-                    }
+fn log_seed_sweep(
+    base_seed: u64,
+    count: u32,
+    state: &mut DevPanelState,
+    map: &mut MapSettings,
+    params: &mut PlanetParams,
+    settings: &mut PlanetSettings,
+) {
+    if count == 0 {
+        return;
+    }
 
-                    // Settings
-                    ButtonKind::BaseFreqMinus => {
-                        settings.base_freq = (settings.base_freq - 0.05).max(0.10);
-                        changed = true;
-                    }
-                    ButtonKind::BaseFreqPlus => {
-                        settings.base_freq = (settings.base_freq + 0.05).min(5.0);
-                        changed = true;
-                    }
-                    ButtonKind::DetailFreqMinus => {
-                        settings.detail_freq = (settings.detail_freq - 0.10).max(0.10);
-                        changed = true;
-                    }
-                    ButtonKind::DetailFreqPlus => {
-                        settings.detail_freq = (settings.detail_freq + 0.10).min(10.0);
-                        changed = true;
-                    }
-                    ButtonKind::WarpFreqMinus => {
-                        settings.warp_freq = (settings.warp_freq - 0.05).max(0.10);
-                        changed = true;
-                    }
-                    ButtonKind::WarpFreqPlus => {
-                        settings.warp_freq = (settings.warp_freq + 0.05).min(5.0);
-                        changed = true;
-                    }
-                    ButtonKind::WarpAmpMinus => {
-                        settings.warp_amp = (settings.warp_amp - 0.005).max(0.0);
-                        changed = true;
-                    }
-                    ButtonKind::WarpAmpPlus => {
-                        settings.warp_amp = (settings.warp_amp + 0.005).min(0.25);
-                        changed = true;
-                    }
-                    ButtonKind::MountainsMinus => {
-                        settings.mountain_strength =
-                            (settings.mountain_strength - 0.05).clamp(0.0, 1.0);
-                        changed = true;
-                    }
-                    ButtonKind::MountainsPlus => {
-                        settings.mountain_strength =
-                            (settings.mountain_strength + 0.05).clamp(0.0, 1.0);
-                        changed = true;
+    info!("seed sweep starting at {} ({} variants)", base_seed, count);
+
+    let mut flagged: Vec<(u64, f32, f32)> = Vec::new();
+    let mut summaries: Vec<PlanetClimateSummary> = Vec::with_capacity(count as usize);
+
+    for offset in 0..count {
+        let seed = base_seed.wrapping_add(offset as u64);
+        let summary = analyze_planet_climate(seed, params, settings);
+        summaries.push(summary);
+
+        let water_pct = summary.water_fraction * 100.0;
+        let deep_pct = summary.deep_water_fraction * 100.0;
+        let coast_pct = summary.coastline_fraction * 100.0;
+        let snow_pct = summary.snow_land_fraction * 100.0;
+
+        info!(
+            "  seed {seed:>6}: water={water_pct:5.1}% deep={deep_pct:5.1}% coast={coast_pct:5.1}% snow_land={snow_pct:5.1}% temp={:.3} moist={:.3} dry={:.3}",
+            summary.avg_land_temperature,
+            summary.avg_land_moisture,
+            summary.avg_land_dryness,
+        );
+
+        if water_pct < 35.0 || water_pct > 65.0 || snow_pct > 35.0 {
+            flagged.push((seed, water_pct, snow_pct));
+        }
+    }
+
+    if flagged.is_empty() {
+        info!("seed sweep complete: no outliers beyond thresholds");
+    } else {
+        for (seed, water_pct, snow_pct) in flagged {
+            warn!("  seed {seed} flagged (water={water_pct:.1}% snow_land={snow_pct:.1}%)");
+        }
+    }
+
+    if let Some(adjustment) = guardrail_adjustment_from_summaries(params, settings, &summaries) {
+        if !adjustment.is_empty() {
+            apply_guardrail_adjustment(params, settings, &adjustment);
+            map.water_level = params.sea_level;
+            apply_guardrail_to_state(state, &adjustment);
+            info!(
+                "guardrail adjustment applied after sweep: sea_level={:?}, height_amp={:?}, mountains={:?}",
+                adjustment.sea_level,
+                adjustment.height_amp,
+                adjustment.mountain_strength
+            );
+        }
+    }
+}
+
+fn slider_input_system(
+    mut state: ResMut<DevPanelState>,
+    mouse_buttons: Res<ButtonInput<MouseButton>>,
+    mut sliders: Query<(&ParameterSlider, &RelativeCursorPosition, &Interaction)>,
+) {
+    if !mouse_buttons.pressed(MouseButton::Left) {
+        state.active_slider = None;
+    }
+
+    for (slider, cursor_pos, interaction) in sliders.iter_mut() {
+        if *interaction == Interaction::Pressed {
+            state.active_slider = Some(slider.descriptor.kind);
+        }
+
+        if let Some(active) = state.active_slider {
+            if active == slider.descriptor.kind && mouse_buttons.pressed(MouseButton::Left) {
+                if cursor_pos.cursor_over {
+                    if let Some(pos) = cursor_pos.normalized {
+                        let value = slider.descriptor.value_from_factor(pos.x);
+                        state.set_parameter(slider.descriptor.kind, value);
                     }
                 }
             }
         }
     }
+}
 
-    if changed {
-        // Keep sampler & planet params in sync with the Dev Panel
-        sampler.0.seed = map.seed;
-        planet.sea_level = map.water_level;
-
-        // Despawn old planet (surface + water) and legacy map meshes if any
-        for e in &planets {
-            despawn_recursive(&mut commands, e, &children_q);
+fn numeric_input_interactions(
+    mut state: ResMut<DevPanelState>,
+    mut query: Query<
+        (
+            Entity,
+            &Interaction,
+            Option<&ParameterInput>,
+            Option<&SeedInput>,
+        ),
+        Changed<Interaction>,
+    >,
+) {
+    for (entity, interaction, parameter_input, seed_input) in query.iter_mut() {
+        if *interaction != Interaction::Pressed {
+            continue;
         }
-        for e in &roots {
-            despawn_recursive(&mut commands, e, &children_q);
-        }
 
-        // Spawn fresh planet
-        spawn_random_planet_inner(
-            &mut commands,
-            &mut meshes,
-            &mut materials,
-            &sampler,
-            &map,
-            &planet,
-        );
+        let kind = if let Some(input) = parameter_input {
+            InputKind::Parameter(input.descriptor.kind)
+        } else if seed_input.is_some() {
+            InputKind::Seed
+        } else {
+            continue;
+        };
 
-        // Refresh mini heightmap
-        if let Some(root) = map_root_q.iter().next() {
-            despawn_recursive(&mut commands, root, &children_q);
-        }
-        spawn_heightmap_widget(&mut commands, &mut images, &map);
+        let buffer = match kind {
+            InputKind::Seed => state.seed.to_string(),
+            InputKind::Parameter(parameter_kind) => {
+                descriptor_for(parameter_kind).format_value(state.parameter_value(parameter_kind))
+            }
+        };
+
+        state.active_input = Some(ActiveInput {
+            entity,
+            kind,
+            buffer,
+        });
     }
 }
 
-fn hotkeys(
-    mut commands: Commands,
-    keys: Res<ButtonInput<KeyCode>>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+fn numeric_input_editing(mut state: ResMut<DevPanelState>, keys: Res<ButtonInput<KeyCode>>) {
+    let active_opt = state.active_input.as_mut();
+    let Some(active) = active_opt else {
+        return;
+    };
+
+    for &(key, ch) in DIGIT_KEYS.iter() {
+        if keys.just_pressed(key) {
+            active.buffer.push(ch);
+        }
+    }
+
+    if keys.just_pressed(KeyCode::Period)
+        || keys.just_pressed(KeyCode::NumpadDecimal)
+        || keys.just_pressed(KeyCode::NumpadComma)
+    {
+        if !active.buffer.contains('.') {
+            active.buffer.push('.');
+        }
+    }
+
+    if keys.just_pressed(KeyCode::Minus) || keys.just_pressed(KeyCode::NumpadSubtract) {
+        if active.buffer.starts_with('-') {
+            active.buffer.remove(0);
+        } else {
+            active.buffer.insert(0, '-');
+        }
+    }
+
+    if keys.just_pressed(KeyCode::Backspace) {
+        active.buffer.pop();
+    }
+
+    if keys.just_pressed(KeyCode::Escape) {
+        state.active_input = None;
+        return;
+    }
+
+    if keys.just_pressed(KeyCode::Enter) {
+        match active.kind {
+            InputKind::Seed => {
+                if let Ok(value) = active.buffer.trim().parse::<u64>() {
+                    if value != state.seed {
+                        state.seed = value;
+                        state.dirty = true;
+                    }
+                }
+            }
+            InputKind::Parameter(kind) => {
+                if let Ok(value) = active.buffer.trim().parse::<f32>() {
+                    state.set_parameter(kind, value);
+                }
+            }
+        }
+        state.active_input = None;
+    }
+}
+
+fn update_value_texts(
+    state: Res<DevPanelState>,
+    mut seed_text: Query<&mut Text, (With<SeedText>, Without<ParameterValueText>)>,
+    mut param_texts: Query<(&mut Text, &ParameterValueText), Without<SeedText>>,
+) {
+    if let Ok(mut text) = seed_text.single_mut() {
+        if let Some(active) = state.active_input.as_ref() {
+            if matches!(active.kind, InputKind::Seed) {
+                text.0 = active.buffer.clone();
+            } else {
+                text.0 = state.seed.to_string();
+            }
+        } else {
+            text.0 = state.seed.to_string();
+        }
+    }
+
+    for (mut text, value_text) in param_texts.iter_mut() {
+        if let Some(active) = state.active_input.as_ref() {
+            if let InputKind::Parameter(kind) = active.kind {
+                if kind == value_text.descriptor.kind {
+                    text.0 = active.buffer.clone();
+                    continue;
+                }
+            }
+        }
+        let value = state.parameter_value(value_text.descriptor.kind);
+        text.0 = value_text.descriptor.format_value(value);
+    }
+}
+
+fn update_slider_handles(
+    state: Res<DevPanelState>,
+    mut sliders: Query<(&ParameterSlider, &Children)>,
+    mut handles: Query<&mut Node, With<SliderHandle>>,
+) {
+    for (slider, children) in sliders.iter_mut() {
+        let value = state.parameter_value(slider.descriptor.kind);
+        let factor = slider.descriptor.factor_from_value(value);
+        let left = factor * (SLIDER_WIDTH - HANDLE_WIDTH);
+
+        for child in children.iter() {
+            if let Ok(mut node) = handles.get_mut(child) {
+                node.left = Val::Px(left);
+            }
+        }
+    }
+}
+
+fn update_input_highlights(
+    state: Res<DevPanelState>,
+    mut parameter_inputs: Query<
+        (Entity, &mut BackgroundColor),
+        (With<ParameterInput>, Without<SeedInput>),
+    >,
+    mut seed_inputs: Query<
+        (Entity, &mut BackgroundColor),
+        (With<SeedInput>, Without<ParameterInput>),
+    >,
+) {
+    for (entity, mut color) in parameter_inputs.iter_mut() {
+        let active = state
+            .active_input
+            .as_ref()
+            .map(|input| input.entity == entity)
+            .unwrap_or(false);
+        *color = if active {
+            BackgroundColor(Color::srgba(0.18, 0.18, 0.25, 1.0))
+        } else {
+            BackgroundColor(Color::srgba(0.13, 0.13, 0.19, 1.0))
+        };
+    }
+
+    for (entity, mut color) in seed_inputs.iter_mut() {
+        let active = state
+            .active_input
+            .as_ref()
+            .map(|input| input.entity == entity)
+            .unwrap_or(false);
+        *color = if active {
+            BackgroundColor(Color::srgba(0.2, 0.2, 0.28, 1.0))
+        } else {
+            BackgroundColor(Color::srgba(0.16, 0.16, 0.22, 1.0))
+        };
+    }
+}
+
+fn apply_changes(
+    mut state: ResMut<DevPanelState>,
     mut map: ResMut<MapSettings>,
-    // planet resources
     mut sampler: ResMut<FlatSamplerRes>,
-    mut planet: ResMut<PlanetParams>,
+    mut planet_params: ResMut<PlanetParams>,
+    mut planet_settings: ResMut<PlanetSettings>,
+    debug: Res<PlanetDebugConfig>,
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut planet_materials: ResMut<Assets<PlanetSurfaceMaterial>>,
+    mut standard_materials: ResMut<Assets<StandardMaterial>>,
     planets: Query<Entity, With<PlanetTag>>,
-    // legacy roots (if any)
     roots: Query<Entity, With<MapRoot>>,
     children_q: Query<&Children>,
-
-    // refresh heightmap preview:
-    mut images: ResMut<Assets<Image>>,
-    map_root_q: Query<Entity, With<DevMapRoot>>,
 ) {
-    if keys.just_pressed(KeyCode::KeyR) {
-        // seed bump + sync
-        map.seed = map.seed.wrapping_add(1);
-        sampler.0.seed = map.seed;
-        planet.sea_level = map.water_level;
-
-        // remove old planet + any legacy map meshes
-        for e in &planets {
-            despawn_recursive(&mut commands, e, &children_q);
-        }
-        for e in &roots {
-            despawn_recursive(&mut commands, e, &children_q);
-        }
-
-        // respawn planet
-        spawn_random_planet_inner(
-            &mut commands,
-            &mut meshes,
-            &mut materials,
-            &sampler,
-            &map,
-            &planet,
-        );
-
-        // refresh mini heightmap
-        if let Some(root) = map_root_q.iter().next() {
-            despawn_recursive(&mut commands, root, &children_q);
-        }
-        spawn_heightmap_widget(&mut commands, &mut images, &map);
+    if !state.dirty {
+        return;
     }
+    state.dirty = false;
+
+    map.seed = state.seed;
+    map.water_level = state.water_level.clamp(0.0, 1.0);
+
+    sampler.0.seed = map.seed;
+
+    planet_params.radius = state.radius.max(1.0);
+    planet_params.height_amp = state.height_amp.max(0.0);
+    planet_params.sea_level = map.water_level;
+    planet_params.rotation_deg = resource_angle_from_slider(state.rotation_deg);
+
+    planet_settings.base_freq = state.base_freq.max(0.0001);
+    planet_settings.detail_freq = state.detail_freq.max(0.0);
+    planet_settings.warp_freq = state.warp_freq.max(0.0);
+    planet_settings.warp_amp = state.warp_amp.max(0.0);
+    planet_settings.mountain_strength = state.mountain_strength.clamp(0.0, 1.0);
+
+    for _ in 0..2 {
+        let mut summaries = Vec::with_capacity(AUTOBALANCE_SWEEP_COUNT as usize);
+        for offset in 0..AUTOBALANCE_SWEEP_COUNT {
+            let seed = state.seed.wrapping_add(offset as u64);
+            summaries.push(analyze_planet_climate(
+                seed,
+                &*planet_params,
+                &*planet_settings,
+            ));
+        }
+        let Some(adjustment) =
+            guardrail_adjustment_from_summaries(&*planet_params, &*planet_settings, &summaries)
+        else {
+            break;
+        };
+        if adjustment.is_empty() {
+            break;
+        }
+        apply_guardrail_adjustment(&mut *planet_params, &mut *planet_settings, &adjustment);
+        map.water_level = planet_params.sea_level.clamp(0.0, 1.0);
+        info!(
+            "auto-balance applied (sea_level={:?}, height_amp={:?}, mountains={:?})",
+            adjustment.sea_level, adjustment.height_amp, adjustment.mountain_strength
+        );
+    }
+
+    for _ in 0..3 {
+        let summary = analyze_planet_climate(map.seed, &*planet_params, &*planet_settings);
+        let guard_adjustment =
+            guardrail_adjustment_from_summary(&*planet_params, &*planet_settings, &summary);
+        if guard_adjustment.is_empty() {
+            break;
+        }
+        apply_guardrail_adjustment(
+            &mut *planet_params,
+            &mut *planet_settings,
+            &guard_adjustment,
+        );
+        map.water_level = planet_params.sea_level.clamp(0.0, 1.0);
+    }
+    state.water_level = map.water_level;
+    state.height_amp = planet_params.height_amp;
+    state.mountain_strength = planet_settings.mountain_strength;
+
+    for entity in planets.iter() {
+        despawn_children_recursive(&mut commands, entity, &children_q);
+    }
+    for entity in roots.iter() {
+        despawn_children_recursive(&mut commands, entity, &children_q);
+    }
+
+    log_planet_configuration(
+        "dev_panel_apply_changes",
+        &map,
+        &planet_params,
+        &planet_settings,
+        &sampler,
+    );
+
+    spawn_random_planet_inner(
+        &mut commands,
+        &mut meshes,
+        &mut *planet_materials,
+        &mut *standard_materials,
+        &*sampler,
+        &*map,
+        &*planet_params,
+        &*planet_settings,
+        &*debug,
+    );
 }
 
-// ----------------- helpers -----------------
-fn despawn_recursive(commands: &mut Commands, entity: Entity, children_q: &Query<&Children>) {
+fn despawn_children_recursive(
+    commands: &mut Commands,
+    entity: Entity,
+    children_q: &Query<&Children>,
+) {
     if let Ok(children) = children_q.get(entity) {
         for child in children.iter() {
-            despawn_recursive(commands, child, children_q);
+            despawn_children_recursive(commands, child, children_q);
         }
     }
     commands.entity(entity).despawn();
 }
 
-// -------- heightmap preview (matches terrain sampling) --------
-#[inline]
-fn hm_hash(seed: u64, x: i32, y: i32) -> u32 {
-    let mut v = seed
-        ^ ((x as u64).wrapping_mul(0x9E37_79B1_85EB_CA87))
-        ^ ((y as u64).wrapping_mul(0xC2B2_AE3D_27D4_EB4F));
-    v ^= v >> 33;
-    v = v.wrapping_mul(0xff51_afd7_ed55_8ccd);
-    v ^= v >> 33;
-    v = v.wrapping_mul(0xc4ceb9fe1a85ec53);
-    v ^= v >> 33;
-    (v & 0xFFFF_FFFF) as u32
-}
-#[inline]
-fn hm_h01(seed: u64, x: i32, y: i32) -> f32 {
-    (hm_hash(seed, x, y) as f32) / (u32::MAX as f32)
-}
-#[inline]
-fn hm_lerp(a: f32, b: f32, t: f32) -> f32 {
-    a + (b - a) * t
-}
-#[inline]
-fn hm_smooth(t: f32) -> f32 {
-    t * t * (3.0 - 2.0 * t)
-}
-
-fn hm_value(seed: u64, x: f32, y: f32) -> f32 {
-    let x0 = x.floor() as i32;
-    let y0 = y.floor() as i32;
-    let x1 = x0 + 1;
-    let y1 = y0 + 1;
-    let tx = hm_smooth(x - x.floor());
-    let ty = hm_smooth(y - y.floor());
-    let v00 = hm_h01(seed, x0, y0);
-    let v10 = hm_h01(seed, x1, y0);
-    let v01 = hm_h01(seed, x0, y1);
-    let v11 = hm_h01(seed, x1, y1);
-    let a = hm_lerp(v00, v10, tx);
-    let b = hm_lerp(v01, v11, tx);
-    hm_lerp(a, b, ty)
-}
-
-fn hm_fbm(seed: u64, x: f32, y: f32, base_freq: f32) -> f32 {
-    let mut amp = 1.0;
-    let mut freq = base_freq.max(0.000_01);
-    let mut sum = 0.0;
-    let mut norm = 0.0;
-    for _ in 0..5 {
-        sum += hm_value(seed, x * freq, y * freq) * amp;
-        norm += amp;
-        amp *= 0.5;
-        freq *= 2.0;
-    }
-    (sum / norm).clamp(0.0, 1.0)
-}
-
-fn hm_effective_water(map: &MapSettings, seed: u64, wx: f32, wz: f32) -> f32 {
-    if map.water_var_amp <= 0.0 {
-        return map.water_level;
-    }
-    let mask = hm_value(
-        seed.wrapping_add(0xBEEF),
-        wx * map.water_var_freq,
-        wz * map.water_var_freq,
-    );
-    map.water_level + map.water_var_amp * (mask - 0.5)
-}
-
-fn generate_heightmap_image(map: &MapSettings, images: &mut Assets<Image>) -> Handle<Image> {
-    let w = map.width as usize;
-    let h = map.height as usize;
-    let ts = map.tile_size;
-
-    let total_w = w as f32 * ts;
-    let total_h = h as f32 * ts;
-    let x0 = -0.5 * total_w;
-    let z0 = -0.5 * total_h;
-
-    let mut px = vec![0u8; w * h * 4];
-
-    for gy in 0..h {
-        for gx in 0..w {
-            let wx = x0 + (gx as f32) * ts;
-            let wz = z0 + (gy as f32) * ts;
-
-            let n = hm_fbm(map.seed, wx, wz, map.base_freq);
-            let water = hm_effective_water(map, map.seed, wx, wz);
-            let h_world = (n - water) * map.height_amplitude;
-
-            // [-amp, +amp] -> [0,1]
-            let t = (0.5 + 0.5 * (h_world / map.height_amplitude)).clamp(0.0, 1.0);
-            let v = (t * 255.0).round() as u8;
-
-            let i = (gy * w + gx) * 4;
-            px[i + 0] = v;
-            px[i + 1] = v;
-            px[i + 2] = v;
-            px[i + 3] = 255;
+impl DevPanelState {
+    fn parameter_value(&self, kind: ParameterKind) -> f32 {
+        match kind {
+            ParameterKind::WaterLevel => self.water_level,
+            ParameterKind::Radius => self.radius,
+            ParameterKind::HeightAmp => self.height_amp,
+            ParameterKind::BaseFreq => self.base_freq,
+            ParameterKind::DetailFreq => self.detail_freq,
+            ParameterKind::WarpFreq => self.warp_freq,
+            ParameterKind::WarpAmp => self.warp_amp,
+            ParameterKind::Mountains => self.mountain_strength,
+            ParameterKind::Rotation => self.rotation_deg,
         }
     }
 
-    let img = Image::new(
-        Extent3d {
-            width: w as u32,
-            height: h as u32,
-            depth_or_array_layers: 1,
-        },
-        TextureDimension::D2,
-        px,
-        TextureFormat::Rgba8UnormSrgb,
-        RenderAssetUsages::RENDER_WORLD,
-    );
+    fn set_parameter(&mut self, kind: ParameterKind, value: f32) {
+        let descriptor = descriptor_for(kind);
+        let clamped = descriptor.clamp(value);
+        let target = match kind {
+            ParameterKind::WaterLevel => &mut self.water_level,
+            ParameterKind::Radius => &mut self.radius,
+            ParameterKind::HeightAmp => &mut self.height_amp,
+            ParameterKind::BaseFreq => &mut self.base_freq,
+            ParameterKind::DetailFreq => &mut self.detail_freq,
+            ParameterKind::WarpFreq => &mut self.warp_freq,
+            ParameterKind::WarpAmp => &mut self.warp_amp,
+            ParameterKind::Mountains => &mut self.mountain_strength,
+            ParameterKind::Rotation => &mut self.rotation_deg,
+        };
 
-    images.add(img)
+        if (clamped - *target).abs() > f32::EPSILON {
+            *target = clamped;
+            self.dirty = true;
+        }
+    }
 }
-
-fn spawn_heightmap_widget(commands: &mut Commands, images: &mut Assets<Image>, map: &MapSettings) {
-    let hm = generate_heightmap_image(map, images);
-    commands
-        .spawn((
-            DevMapRoot,
-            Node {
-                width: Val::Px(170.0),
-                height: Val::Px(170.0),
-                position_type: PositionType::Absolute,
-                top: Val::Px(12.0),
-                right: Val::Px(12.0),
-                padding: UiRect::all(Val::Px(6.0)),
-                ..default()
-            },
-            BackgroundColor(Color::srgba(0.05, 0.05, 0.06, 0.85)),
-        ))
-        .with_children(|p| {
-            p.spawn((
-                HeightmapWidget,
-                Node {
-                    width: Val::Percent(100.0),
-                    height: Val::Percent(100.0),
-                    ..default()
-                },
-                ImageNode::new(hm),
-            ));
-        });
+fn apply_guardrail_to_state(state: &mut DevPanelState, adjustment: &GuardrailAdjustment) {
+    if let Some(sea) = adjustment.sea_level {
+        state.set_parameter(ParameterKind::WaterLevel, sea);
+    }
+    if let Some(height) = adjustment.height_amp {
+        state.set_parameter(ParameterKind::HeightAmp, height);
+    }
+    if let Some(mountain) = adjustment.mountain_strength {
+        state.set_parameter(ParameterKind::Mountains, mountain);
+    }
 }

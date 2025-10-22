@@ -4,6 +4,8 @@ use bevy::window::PrimaryWindow;
 use std::f32::consts::PI;
 
 use crate::app::AppState;
+use crate::core::planet_camera::{ScaleFovByAltitude, ScaledWheelZoom};
+use crate::core::unified_planet_camera::{MainCamera, PlanetCamera};
 use crate::game::world::planet::PlanetParams;
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -53,7 +55,7 @@ const ZOOM_RATE_ORBIT: f32 = 0.08; // orbit-distance scale per notch
 // smoothing (critically damped)
 const TAU_ROT: f32 = 0.06;
 const TAU_POS: f32 = 0.06;
-const TAU_ZOOM: f32 = 0.08;
+const TAU_ZOOM: f32 = 0.25;
 
 // first-person speed
 const FP_SPEED: f32 = 5.0;
@@ -202,6 +204,23 @@ fn spawn_camera(mut commands: Commands, planet: Option<Res<PlanetParams>>) {
     commands.spawn((
         Camera3d::default(),
         Transform::from_translation(eye).looking_to(forward, up),
+        ScaleFovByAltitude {
+            near_deg: 55.0,
+            far_deg: 85.0,
+            far_at_radii: 3.0,
+        },
+        AmbientLight {
+            color: Color::srgb(0.25, 0.25, 0.30),
+            brightness: 500.0,
+            affects_lightmapped_meshes: true,
+        },
+        ScaledWheelZoom {
+            base_speed: 120.0,
+            speed_per_radius: 1.6,
+            smoothing: 0.15,
+        },
+        PlanetCamera::default(),
+        MainCamera,
         GameCamera {
             yaw,
             pitch,
