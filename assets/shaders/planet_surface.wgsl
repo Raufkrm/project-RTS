@@ -96,6 +96,25 @@ struct NoiseSample {
     grad: vec3<f32>,
 }
 
+struct ClimateFields {
+    continent_value: f32,
+    land_mask: f32,
+    macro_relief: f32,
+    mountain_seed: f32,
+    erosion: f32,
+    detail: f32,
+    moisture_noise: f32,
+}
+
+struct ClimateDebugSample {
+    continent_value: f32,
+    land_mask: f32,
+    height01: f32,
+    moisture: f32,
+    temperature: f32,
+    slope: f32,
+}
+
 fn value3_with_derivative(seed: u32, coord: vec3<f32>) -> NoiseSample {
     let x0 = i32(floor(coord.x));
     let y0 = i32(floor(coord.y));
@@ -167,6 +186,196 @@ fn fbm3_with_derivative(seed: u32, x: f32, y: f32, z: f32, base_freq: f32) -> No
     }
 
     return NoiseSample(clamp(total / norm, 0.0, 1.0), grad / norm);
+}
+
+fn fbm3_value(seed: u32, coord: vec3<f32>, base_freq: f32) -> f32 {
+    return fbm3_with_derivative(seed, coord.x, coord.y, coord.z, base_freq).value;
+}
+
+fn to_signed(value: f32) -> f32 {
+    return value * 2.0 - 1.0;
+}
+
+fn climate_sample_fields(coord: vec3<f32>) -> ClimateFields {
+    let base_f = max(material.base_freq, 1e-5);
+    let detail_f = max(material.detail_freq, 1e-5);
+
+    let plate_a = to_signed(fbm3_value(
+        material.seed,
+        vec3(coord.x * 0.55, coord.y * 0.53, coord.z * 0.57),
+        base_f * 0.55,
+    ));
+    let plate_b = to_signed(fbm3_value(
+        material.seed ^ 0x11u,
+        vec3(coord.z * 0.48, coord.x * 0.52, coord.y * 0.51),
+        base_f * 0.45,
+    ));
+    let coast_noise = to_signed(fbm3_value(
+        material.seed ^ 0x21u,
+        vec3(coord.x * 1.2, coord.y * 1.1, coord.z * 1.15),
+        base_f * 1.05,
+    ));
+
+    let continent_value = plate_a * 0.75 + plate_b * 0.45 + coast_noise * 0.28 - 0.05;
+    let land_mask = smoothstep(-0.18, 0.22, continent_value);
+
+    let macro_relief = pow(
+        fbm3_value(
+            material.seed ^ 0x33u,
+            vec3(coord.x * 0.95, coord.y * 0.85, coord.z * 0.9),
+            base_f * 0.9,
+        ),
+        1.6,
+    );
+    let mountain_seed = fbm3_value(
+        material.seed ^ 0x43u,
+        vec3(coord.y * 1.8, coord.z * 1.6, coord.x * 1.7),
+        detail_f * 0.7,
+    );
+    let erosion = pow(
+        fbm3_value(
+            material.seed ^ 0x53u,
+            vec3(coord.z * 1.4, coord.x * 1.3, coord.y * 1.35),
+            detail_f * 0.8,
+        ),
+        1.8,
+    );
+    let detail = fbm3_value(
+        material.seed ^ 0x63u,
+        vec3(coord.x * 3.3, coord.y * 3.1, coord.z * 3.2),
+        detail_f * 2.1,
+    );
+    let moisture_noise = fbm3_value(
+        material.seed ^ 0x73u,
+        vec3(coord.x * 1.05, coord.y * 1.02, coord.z * 1.03),
+        base_f * 1.3,
+    );
+
+    return ClimateFields(
+        continent_value,
+        land_mask,
+        macro_relief,
+        mountain_seed,
+        erosion,
+        detail,
+        moisture_noise,
+    );
+}
+
+fn compose_height_from_fields(fields: ClimateFields) -> f32 {
+    var height =
+        fields.continent_value * 0.48 + (fields.land_mask - 0.5) * 0.65;
+    height = height + (fields.macro_relief - 0.5) * 0.42;
+    height = height + (fields.erosion - 0.5) * 0.22;
+    height = height + pow(max(fields.mountain_seed, 1e-6), 0.9) * material.mountain_scale * 1.12;
+    height = height + (fields.detail - 0.5) * 0.09;
+    height = height + pow(fields.land_mask, 3.2) * 0.08;
+    return clamp(height * 0.58 + 0.5, 0.0, 1.0);
+}
+
+fn climate_debug_evaluate(unit: vec3<f32>) -> ClimateDebugSample {
+    let warp_f = max(material.warp_freq, 1e-5);
+    let seed = material.seed;
+
+    let warp_offset = vec3(
+        fbm3_value(seed ^ 0xA1u, vec3(unit.x, unit.y, unit.z), warp_f) - 0.5,
+        fbm3_value(seed ^ 0xB2u, vec3(unit.z, unit.x, unit.y), warp_f) - 0.5,
+        fbm3_value(seed ^ 0xC3u, vec3(unit.y, unit.z, unit.x), warp_f) - 0.5,
+    );
+    let warped = unit + warp_offset * material.warp_amp;
+
+    let center = climate_sample_fields(warped);
+    let height01 = compose_height_from_fields(center);
+
+    let eps = 0.012;
+    let sample_px = climate_sample_fields(warped + vec3(eps, 0.0, 0.0));
+    let sample_mx = climate_sample_fields(warped - vec3(eps, 0.0, 0.0));
+    let sample_py = climate_sample_fields(warped + vec3(0.0, eps, 0.0));
+    let sample_my = climate_sample_fields(warped - vec3(0.0, eps, 0.0));
+    let sample_pz = climate_sample_fields(warped + vec3(0.0, 0.0, eps));
+    let sample_mz = climate_sample_fields(warped - vec3(0.0, 0.0, eps));
+
+    let hx1 = compose_height_from_fields(sample_px);
+    let hx0 = compose_height_from_fields(sample_mx);
+    let hy1 = compose_height_from_fields(sample_py);
+    let hy0 = compose_height_from_fields(sample_my);
+    let hz1 = compose_height_from_fields(sample_pz);
+    let hz0 = compose_height_from_fields(sample_mz);
+
+    let grad_x = (hx1 - hx0) / (2.0 * eps);
+    let grad_y = (hy1 - hy0) / (2.0 * eps);
+    let grad_z = (hz1 - hz0) / (2.0 * eps);
+
+    let slope = min(
+        clamp(sqrt(grad_x * grad_x + grad_y * grad_y + grad_z * grad_z), 0.0, 1.4),
+        1.0,
+    );
+
+    let lat_abs = abs(unit.y);
+
+    let land_grad_x = abs(sample_px.land_mask - sample_mx.land_mask);
+    let land_grad_y = abs(sample_py.land_mask - sample_my.land_mask);
+    let land_grad_z = abs(sample_pz.land_mask - sample_mz.land_mask);
+    let coast_gradient = clamp(
+        sqrt(
+            (land_grad_x * land_grad_x + land_grad_y * land_grad_y + land_grad_z * land_grad_z)
+                / 3.0,
+        ),
+        0.0,
+        1.0,
+    );
+
+    let coast_band = clamp(center.land_mask * (1.0 - center.land_mask) * 4.0, 0.0, 1.0);
+    let interior = pow(center.land_mask, 3.0);
+    let dryness_distance =
+        max(1.0 - clamp(coast_band + coast_gradient * 0.6, 0.0, 1.2), 0.0);
+    let dryness_base =
+        clamp(pow(interior, 1.1) * pow(dryness_distance, 1.2), 0.0, 1.0);
+    let dryness_noise = (center.detail - 0.5) * 0.2;
+    let dryness = clamp(
+        dryness_base + material.dryness_bias_global + dryness_noise,
+        0.0,
+        1.0,
+    );
+
+    let rain_shadow = pow(center.mountain_seed * dryness_distance, 1.3);
+    var moisture = clamp(
+        center.moisture_noise * 0.55 + coast_band * 1.05 - interior * 0.35,
+        0.0,
+        1.0,
+    );
+    moisture = clamp(moisture - rain_shadow * 0.45, 0.0, 1.0);
+    moisture = moisture + (1.0 - interior) * 0.04;
+    moisture = clamp(moisture + material.moisture_bias_global, 0.0, 1.0);
+    moisture = clamp(moisture - dryness * 0.25, 0.0, 1.0);
+
+    let elev01 =
+        clamp((height01 - material.sea_level) / max(1.0 - material.sea_level, 1e-3), 0.0, 1.0);
+    let tilt_cooling = (material.axial_tilt * 1.15) * pow(lat_abs, 1.1);
+    let base_temp = clamp(
+        1.0 - pow(lat_abs, 1.45) - tilt_cooling + material.temp_shift,
+        0.0,
+        1.0,
+    );
+    let altitude_cooling = pow(elev01, 0.65) * 0.7 + pow(slope, 0.75) * 0.15;
+    let temp_variation = (center.detail - 0.5) * 0.18;
+    let moisture_cooling = moisture * 0.1;
+    var temperature = clamp(
+        base_temp + temp_variation - altitude_cooling - moisture_cooling + dryness * 0.05,
+        0.0,
+        1.0,
+    );
+    temperature = temperature - smoothstep(0.72, 0.98, lat_abs) * 0.18;
+    temperature = clamp(temperature, 0.0, 1.0);
+
+    return ClimateDebugSample(
+        center.continent_value,
+        center.land_mask,
+        height01,
+        moisture,
+        temperature,
+        slope,
+    );
 }
 
 fn biome_color(temperature: f32, moisture: f32) -> vec3<f32> {
@@ -245,6 +454,23 @@ fn fragment(vertex_output: VertexOutput, @builtin(front_facing) is_front: bool) 
     pbr_input.material.flags = pbr_types::STANDARD_MATERIAL_FLAGS_ALPHA_MODE_OPAQUE;
 
     let unit = decode_unit_octa(vertex_output.uv);
+
+    if material.debug_mode != 0u {
+        let debug_sample = climate_debug_evaluate(unit);
+        let debug_rgb = debug_color(
+            material.debug_mode,
+            debug_sample.continent_value,
+            debug_sample.land_mask,
+            debug_sample.height01,
+            debug_sample.moisture,
+            debug_sample.temperature,
+            debug_sample.slope,
+        );
+        var debug_out: FragmentOutput;
+        debug_out.color = vec4(debug_rgb, 1.0);
+        return debug_out;
+    }
+
     let pack_md = decode_pair(vertex_output.uv_b.x);
     let pack_cs = decode_pair(vertex_output.uv_b.y);
     let pack_ht = decode_pair(vertex_output.color.x);
@@ -279,21 +505,6 @@ fn fragment(vertex_output: VertexOutput, @builtin(front_facing) is_front: bool) 
     let elev01 = clamp((height01 - material.sea_level) / max(1.0 - material.sea_level, 1e-3), 0.0, 1.0);
     let shore_mix = pow(max(1.0 - depth, 0.0), 0.6);
     let polar_cap = smoothstep(0.88, 1.0, lat_abs);
-
-    if material.debug_mode != 0u {
-        let debug_rgb = debug_color(
-            material.debug_mode,
-            continent_value,
-            land_mask,
-            height01,
-            moisture,
-            temperature,
-            slope,
-        );
-        var debug_out: FragmentOutput;
-        debug_out.color = vec4(debug_rgb, 1.0);
-        return debug_out;
-    }
 
     var normal = normalize(pbr_input.N);
     var grad = detail.grad * (material.normal_strength * 0.9);

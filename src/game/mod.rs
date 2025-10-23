@@ -78,7 +78,12 @@ impl Plugin for GamePlugin {
     }
 }
 
-fn inspect_planet_material_layout(render_device: Res<RenderDevice>) {
+fn inspect_planet_material_layout(render_device: Res<RenderDevice>, mut logged: Local<bool>) {
+    if *logged {
+        return;
+    }
+    *logged = true;
+
     let base_entries =
         <StandardMaterial as AsBindGroup>::bind_group_layout_entries(&render_device, false)
             .into_iter()
@@ -89,8 +94,8 @@ fn inspect_planet_material_layout(render_device: Res<RenderDevice>) {
             .into_iter()
             .map(|e| (e.binding, e.visibility, e.ty))
             .collect::<Vec<_>>();
-    info!("StandardMaterial bindings: {:?}", base_entries);
-    info!("PlanetSurfaceMaterial bindings: {:?}", extended_entries);
+    debug!("StandardMaterial bindings: {:?}", base_entries);
+    debug!("PlanetSurfaceMaterial bindings: {:?}", extended_entries);
 }
 
 fn setup_world(

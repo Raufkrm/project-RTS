@@ -7,7 +7,7 @@ use bevy::prelude::*;
 use bevy::reflect::TypePath;
 use bevy::render::alpha::AlphaMode;
 use bevy::render::render_resource::{AsBindGroup, PrimitiveTopology, ShaderType};
-use bevy::shader::ShaderRef; // ΓåÉ correct place for your Bevy version
+use bevy::shader::ShaderRef; // correct place for your Bevy version
 use bevy_mesh::{Indices, Mesh, VertexAttributeValues};
 use bevy::pbr::MaterialPlugin;
 
@@ -78,7 +78,7 @@ impl Default for PlanetSurfaceParams {
                 _pad1: 0,
                 sea_level: 0.5,
                 base_freq: 0.65,
-                detail_freq: 8.0,
+                detail_freq: 0.5,
                 warp_freq: 1.6,
                 warp_amp: 0.04,
                 coast_width: 0.028,
@@ -92,8 +92,8 @@ impl Default for PlanetSurfaceParams {
                 perceptual_roughness: 0.75,
                 metallic: 0.0,
                 reflectance: 0.04,
-                rock_start: 0.42,
-                snow_start: 0.68,
+                rock_start: 0.54,
+                snow_start: 0.82,
                 water_deep: srgb_to_linear_vec3(Vec3::new(0.04, 0.11, 0.28)).extend(1.0),
                 water_shallow: srgb_to_linear_vec3(Vec3::new(0.27, 0.56, 0.78)).extend(1.0),
                 land_sand: srgb_to_linear_vec3(Vec3::new(0.88, 0.78, 0.52)).extend(1.0),
@@ -232,11 +232,11 @@ impl Default for PlanetSettings {
     fn default() -> Self {
         Self {
             base_freq: 0.65,
-            detail_freq: 8.0,
+            detail_freq: 0.5,
             warp_freq: 1.6,
             warp_amp: 0.04,
             coast_width: 0.028,
-            mountain_strength: 0.42,
+            mountain_strength: 0.35,
             mountain_spikiness: 0.55, // richer ridges by default
 
             water_deep: Vec3::new(0.04, 0.11, 0.28),
@@ -247,8 +247,8 @@ impl Default for PlanetSettings {
 
             land_rock: Vec3::new(0.48, 0.5, 0.54), // cooler granite
             land_snow: Vec3::new(0.95, 0.98, 1.0), // crisp snow
-            rock_start: 0.42,                      // grass fades to rock
-            snow_start: 0.68,                      // rock fades to snow
+            rock_start: 0.54,                      // grass fades to rock
+            snow_start: 0.82,                      // rock fades to snow
         }
     }
 }
@@ -310,7 +310,9 @@ impl<'a> ClimateModel<'a> {
         let base_f = settings.base_freq.max(1e-5);
         let detail_f = settings.detail_freq.max(1e-5);
         let warp_f = settings.warp_freq.max(1e-5);
-        let mountain_scale = 0.3 + settings.mountain_strength.clamp(0.0, 1.0) * 0.7;
+        let mountain_detail_factor = (detail_f / 1.0).sqrt().clamp(0.35, 1.5);
+        let adaptive_mountain = settings.mountain_strength.clamp(0.0, 1.0) * mountain_detail_factor;
+        let mountain_scale = 0.3 + adaptive_mountain * 0.7;
         let axial_noise = h01_3(seed ^ 0xA0, 0, 0, 0);
         let axial_tilt = 0.18 + axial_noise * 0.22;
         let temp_shift = (h01_3(seed ^ 0xA1, 1, 0, 0) - 0.5) * 0.18;
@@ -920,6 +922,18 @@ fn spawn_planet_with_settings(
     settings: &PlanetSettings,
     debug: &PlanetDebugConfig,
 ) {
+    let climate_summary = analyze_planet_climate(sampler_res.0.seed, params, settings);
+    info!(
+        "climate summary: water={:.2} deep={:.2} coast={:.2} snow={:.2} temp={:.2} moisture={:.2} dryness={:.2}",
+        climate_summary.water_fraction,
+        climate_summary.deep_water_fraction,
+        climate_summary.coastline_fraction,
+        climate_summary.snow_land_fraction,
+        climate_summary.avg_land_temperature,
+        climate_summary.avg_land_moisture,
+        climate_summary.avg_land_dryness,
+    );
+
     let land_mesh = build_colored_planet_mesh(settings, sampler_res, params, debug.mode);
     if let Some(VertexAttributeValues::Float32x3(positions)) =
         land_mesh.attribute(Mesh::ATTRIBUTE_POSITION)
@@ -1087,55 +1101,70 @@ pub fn update_planet_lod(
         let center = planet_tf.translation();
         let dist = cam_tf.translation().distance(center).max(1.0);
 
-        let r = params.radius.max(1.0);
-        let radii = dist / r;
+        let radius = params.radius.max(1.0);
+        let altitude = (dist - radius).max(0.0);
+        let altitude_ratio = altitude / radius;
 
-        // distance-based LOD with hysteresis to avoid thrashing
-        let bands = [1.2, 2.0, 3.4, 5.2, 7.2];
-        let margin = 0.25;
-        let desired = if radii < bands[0] {
+        // Near surface we want maximum tessellation, progressively dropping detail
+        // as the camera pulls away. These thresholds are expressed relative to the
+        // planet radius so larger worlds scale automatically.
+        const ALTITUDE_BANDS: [f32; 5] = [0.002, 0.008, 0.02, 0.05, 0.12];
+        let desired = if altitude_ratio <= ALTITUDE_BANDS[0] {
             7
-        } else if radii < bands[1] {
+        } else if altitude_ratio <= ALTITUDE_BANDS[1] {
             6
-        } else if radii < bands[2] {
+        } else if altitude_ratio <= ALTITUDE_BANDS[2] {
             5
-        } else if radii < bands[3] {
+        } else if altitude_ratio <= ALTITUDE_BANDS[3] {
             4
-        } else if radii < bands[4] {
+        } else if altitude_ratio <= ALTITUDE_BANDS[4] {
             3
         } else {
             2
         };
 
+        // Provide hysteresis so we do not thrash at the boundaries. The margin grows
+        // with distance, which keeps close-up transitions crisp but relaxes them for
+        // high-altitude flyovers.
+        let margin = (0.001 + altitude_ratio * 0.1).min(0.05);
+
         let mut target = lod.level;
         match lod.level {
             7 => {
-                if radii > bands[0] + margin {
+                if altitude_ratio > ALTITUDE_BANDS[0] + margin {
                     target = desired;
                 }
             }
             6 => {
-                if radii < bands[0] - margin || radii > bands[1] + margin {
+                if altitude_ratio < ALTITUDE_BANDS[0] - margin
+                    || altitude_ratio > ALTITUDE_BANDS[1] + margin
+                {
                     target = desired;
                 }
             }
             5 => {
-                if radii < bands[1] - margin || radii > bands[2] + margin {
+                if altitude_ratio < ALTITUDE_BANDS[1] - margin
+                    || altitude_ratio > ALTITUDE_BANDS[2] + margin
+                {
                     target = desired;
                 }
             }
             4 => {
-                if radii < bands[2] - margin || radii > bands[3] + margin {
+                if altitude_ratio < ALTITUDE_BANDS[2] - margin
+                    || altitude_ratio > ALTITUDE_BANDS[3] + margin
+                {
                     target = desired;
                 }
             }
             3 => {
-                if radii < bands[3] - margin || radii > bands[4] + margin {
+                if altitude_ratio < ALTITUDE_BANDS[3] - margin
+                    || altitude_ratio > ALTITUDE_BANDS[4] + margin
+                {
                     target = desired;
                 }
             }
             2 => {
-                if radii < bands[4] - margin {
+                if altitude_ratio < ALTITUDE_BANDS[4] - margin {
                     target = desired;
                 }
             }
