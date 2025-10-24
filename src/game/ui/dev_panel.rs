@@ -14,6 +14,7 @@ use crate::game::world::planet::{
 };
 use crate::game::world::sampling::FlatSamplerRes;
 use crate::game::world::terrain::{MapRoot, MapSettings};
+use crate::game::SunSettings;
 
 pub struct DevPanelPlugin;
 
@@ -49,7 +50,7 @@ impl Plugin for DevPanelPlugin {
     }
 }
 
-#[derive(Resource, Default)]
+#[derive(Resource)]
 struct DevPanelState {
     open: bool,
     fps_smooth: f32,
@@ -64,10 +65,34 @@ struct DevPanelState {
     warp_amp: f32,
     mountain_strength: f32,
     rotation_deg: f32,
+    sun_brightness: f32,
 
     dirty: bool,
     active_slider: Option<ParameterKind>,
     active_input: Option<ActiveInput>,
+}
+
+impl Default for DevPanelState {
+    fn default() -> Self {
+        Self {
+            open: false,
+            fps_smooth: 0.0,
+            seed: 0,
+            water_level: 0.0,
+            radius: 0.0,
+            height_amp: 0.0,
+            base_freq: 0.0,
+            detail_freq: 0.0,
+            warp_freq: 0.0,
+            warp_amp: 0.0,
+            mountain_strength: 0.0,
+            rotation_deg: 0.0,
+            sun_brightness: 0.10,
+            dirty: false,
+            active_slider: None,
+            active_input: None,
+        }
+    }
 }
 
 struct ActiveInput {
@@ -93,6 +118,7 @@ enum ParameterKind {
     WarpAmp,
     Mountains,
     Rotation,
+    SunBrightness,
 }
 
 #[derive(Clone, Copy)]
@@ -146,7 +172,7 @@ impl ParameterDescriptor {
     }
 }
 
-const PARAM_DESCRIPTORS: [ParameterDescriptor; 9] = [
+const PARAM_DESCRIPTORS: [ParameterDescriptor; 10] = [
     ParameterDescriptor {
         kind: ParameterKind::WaterLevel,
         label: "Water Level",
@@ -218,6 +244,14 @@ const PARAM_DESCRIPTORS: [ParameterDescriptor; 9] = [
         max: 180.0,
         log_scale: false,
         precision: 1,
+    },
+    ParameterDescriptor {
+        kind: ParameterKind::SunBrightness,
+        label: "Sun Brightness",
+        min: 0.1,
+        max: 5.0,
+        log_scale: true,
+        precision: 2,
     },
 ];
 
@@ -320,6 +354,7 @@ fn spawn_dev_panel(
     map: Res<MapSettings>,
     params: Res<PlanetParams>,
     settings: Res<PlanetSettings>,
+    sun_settings: Res<SunSettings>,
 ) {
     state.open = true;
     state.active_input = None;
@@ -337,6 +372,7 @@ fn spawn_dev_panel(
     state.warp_amp = settings.warp_amp;
     state.mountain_strength = settings.mountain_strength;
     state.rotation_deg = slider_angle_from_resource(params.rotation_deg);
+    state.sun_brightness = sun_settings.brightness;
 
     let font = asset_server.load("fonts/arial.ttf");
 
@@ -974,6 +1010,7 @@ fn apply_changes(
     mut sampler: ResMut<FlatSamplerRes>,
     mut planet_params: ResMut<PlanetParams>,
     mut planet_settings: ResMut<PlanetSettings>,
+    mut sun_settings: ResMut<SunSettings>,
     debug: Res<PlanetDebugConfig>,
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -1003,6 +1040,13 @@ fn apply_changes(
     planet_settings.warp_freq = state.warp_freq.max(0.0);
     planet_settings.warp_amp = state.warp_amp.max(0.0);
     planet_settings.mountain_strength = state.mountain_strength.clamp(0.0, 1.0);
+
+    let sun_descriptor = descriptor_for(ParameterKind::SunBrightness);
+    let brightness = sun_descriptor.clamp(state.sun_brightness);
+    if (sun_settings.brightness - brightness).abs() > f32::EPSILON {
+        sun_settings.brightness = brightness;
+    }
+    state.sun_brightness = brightness;
 
     for _ in 0..2 {
         let mut summaries = Vec::with_capacity(AUTOBALANCE_SWEEP_COUNT as usize);
@@ -1101,6 +1145,7 @@ impl DevPanelState {
             ParameterKind::WarpAmp => self.warp_amp,
             ParameterKind::Mountains => self.mountain_strength,
             ParameterKind::Rotation => self.rotation_deg,
+            ParameterKind::SunBrightness => self.sun_brightness,
         }
     }
 
@@ -1117,6 +1162,7 @@ impl DevPanelState {
             ParameterKind::WarpAmp => &mut self.warp_amp,
             ParameterKind::Mountains => &mut self.mountain_strength,
             ParameterKind::Rotation => &mut self.rotation_deg,
+            ParameterKind::SunBrightness => &mut self.sun_brightness,
         };
 
         if (clamped - *target).abs() > f32::EPSILON {

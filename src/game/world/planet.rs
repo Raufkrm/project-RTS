@@ -2,16 +2,13 @@ use crate::game::world::sampling::FlatSamplerRes;
 use crate::game::world::terrain::MapSettings;
 use bevy::asset::RenderAssetUsages;
 use bevy::log::info;
-use bevy::pbr::{wireframe::Wireframe, ExtendedMaterial, MaterialExtension, StandardMaterial};
+use bevy::pbr::{wireframe::Wireframe, MaterialExtension, StandardMaterial};
 use bevy::prelude::*;
 use bevy::reflect::TypePath;
 use bevy::render::alpha::AlphaMode;
 use bevy::render::render_resource::{AsBindGroup, PrimitiveTopology, ShaderType};
 use bevy::shader::ShaderRef; // correct place for your Bevy version
 use bevy_mesh::{Indices, Mesh, VertexAttributeValues};
-use bevy::pbr::MaterialPlugin;
-
-
 
 // -----------------------------------------------------------------------------
 // Tags / params
@@ -28,8 +25,6 @@ pub struct PlanetSurfaceParams {
     #[uniform(31)]
     pub params: PlanetSurfaceUniform,
 }
-
-
 
 #[repr(C)] // keep alignment stable
 #[derive(Clone, Copy, ShaderType)] // from bevy_render::render_resource::ShaderType
@@ -67,7 +62,6 @@ pub struct PlanetSurfaceUniform {
 pub type PlanetSurfaceMaterial =
     bevy::pbr::ExtendedMaterial<bevy::pbr::StandardMaterial, PlanetSurfaceParams>;
 
-
 impl Default for PlanetSurfaceParams {
     fn default() -> Self {
         Self {
@@ -78,7 +72,7 @@ impl Default for PlanetSurfaceParams {
                 _pad1: 0,
                 sea_level: 0.5,
                 base_freq: 0.65,
-                detail_freq: 0.5,
+                detail_freq: 0.1,
                 warp_freq: 1.6,
                 warp_amp: 0.04,
                 coast_width: 0.028,
@@ -525,9 +519,14 @@ impl<'a> ClimateModel<'a> {
         let moisture_factor = ((moisture - 0.55) / 0.45).clamp(0.0, 1.0);
         let mut snow_score =
             (polar_cap * 0.7 + high_altitude * 0.35 + cold_factor * 0.55).clamp(0.0, 1.0);
+        let temp_suppression = ((0.45 - temperature) / 0.25).clamp(0.0, 1.0);
+        snow_score *= temp_suppression;
         snow_score *= moisture_factor;
         snow_score *= 1.0 - dryness.powf(1.5);
-        let allow_alpine = high_altitude > 0.6 && cold_factor > 0.6 && moisture_factor > 0.4;
+        let allow_alpine = temp_suppression > 0.0
+            && high_altitude > 0.6
+            && cold_factor > 0.6
+            && moisture_factor > 0.4;
 
         ClimateEval {
             final_pos,
@@ -744,8 +743,10 @@ pub fn analyze_planet_climate(
             temp_sum += eval.temperature;
             moisture_sum += eval.moisture;
             dryness_sum += eval.dryness;
-            if eval.snow_score > 0.62 && (eval.lat_abs > 0.88 || eval.allow_alpine) {
-                let snow_k = ((eval.snow_score - 0.62) / 0.38).clamp(0.0, 1.0);
+            let temp_suppression = ((0.45 - eval.temperature) / 0.25).clamp(0.0, 1.0);
+            let effective_snow = eval.snow_score * temp_suppression;
+            if effective_snow > 0.62 && (eval.lat_abs > 0.88 || eval.allow_alpine) {
+                let snow_k = ((effective_snow - 0.62) / 0.38).clamp(0.0, 1.0);
                 snow_sum += snow_k;
             }
         }
@@ -1092,7 +1093,7 @@ pub fn update_planet_lod(
     settings: Res<PlanetSettings>, // <-- add this
     debug: Res<PlanetDebugConfig>,
 ) {
-    // single() ΓåÆ single() in 0.18
+    // single() single() in 0.18
     let Ok(cam_tf) = q_cam.single() else {
         return;
     };
@@ -1103,80 +1104,36 @@ pub fn update_planet_lod(
 
         let radius = params.radius.max(1.0);
         let altitude = (dist - radius).max(0.0);
-        let altitude_ratio = altitude / radius;
+        let _altitude_ratio = altitude / radius;
 
         // Near surface we want maximum tessellation, progressively dropping detail
         // as the camera pulls away. These thresholds are expressed relative to the
-        // planet radius so larger worlds scale automatically.
-        const ALTITUDE_BANDS: [f32; 5] = [0.002, 0.008, 0.02, 0.05, 0.12];
-        let desired = if altitude_ratio <= ALTITUDE_BANDS[0] {
+        // planet radius so larger worlds scale automatically and align with the
+        // debug rings rendered in development builds.
+        const ALTITUDE_FACTORS: [f32; 5] = [0.002, 0.008, 0.02, 0.05, 0.12];
+        let ring_altitudes = ALTITUDE_FACTORS.map(|f| params.radius.max(1.0) * f);
+
+        let desired = if altitude <= ring_altitudes[0] {
             7
-        } else if altitude_ratio <= ALTITUDE_BANDS[1] {
+        } else if altitude <= ring_altitudes[1] {
             6
-        } else if altitude_ratio <= ALTITUDE_BANDS[2] {
+        } else if altitude <= ring_altitudes[2] {
             5
-        } else if altitude_ratio <= ALTITUDE_BANDS[3] {
+        } else if altitude <= ring_altitudes[3] {
             4
-        } else if altitude_ratio <= ALTITUDE_BANDS[4] {
+        } else if altitude <= ring_altitudes[4] {
             3
         } else {
             2
         };
 
-        // Provide hysteresis so we do not thrash at the boundaries. The margin grows
-        // with distance, which keeps close-up transitions crisp but relaxes them for
-        // high-altitude flyovers.
-        let margin = (0.001 + altitude_ratio * 0.1).min(0.05);
+        if desired != lod.level {
+            info!(
+                "Planet LOD switched to level {} (alt {:.1}, radius {:.1})",
+                desired, altitude, params.radius
+            );
+            lod.level = desired;
 
-        let mut target = lod.level;
-        match lod.level {
-            7 => {
-                if altitude_ratio > ALTITUDE_BANDS[0] + margin {
-                    target = desired;
-                }
-            }
-            6 => {
-                if altitude_ratio < ALTITUDE_BANDS[0] - margin
-                    || altitude_ratio > ALTITUDE_BANDS[1] + margin
-                {
-                    target = desired;
-                }
-            }
-            5 => {
-                if altitude_ratio < ALTITUDE_BANDS[1] - margin
-                    || altitude_ratio > ALTITUDE_BANDS[2] + margin
-                {
-                    target = desired;
-                }
-            }
-            4 => {
-                if altitude_ratio < ALTITUDE_BANDS[2] - margin
-                    || altitude_ratio > ALTITUDE_BANDS[3] + margin
-                {
-                    target = desired;
-                }
-            }
-            3 => {
-                if altitude_ratio < ALTITUDE_BANDS[3] - margin
-                    || altitude_ratio > ALTITUDE_BANDS[4] + margin
-                {
-                    target = desired;
-                }
-            }
-            2 => {
-                if altitude_ratio < ALTITUDE_BANDS[4] - margin {
-                    target = desired;
-                }
-            }
-            _ => {
-                target = desired;
-            }
-        }
-
-        if target != lod.level {
-            lod.level = target;
-
-            // mutate the mesh asset via its handle on Mesh3d
             if let Some(mesh) = meshes.get_mut(&mesh_h.0) {
                 let new = build_colored_planet_mesh_with_subdiv(
                     lod.level,

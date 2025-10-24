@@ -247,7 +247,7 @@ fn spawn_one_patch(
 }
 
 #[inline]
-fn sampler_height_amp(sampler: &impl WorldSampler) -> f32 {
+fn sampler_height_amp(_sampler: &impl WorldSampler) -> f32 {
     // Our current sampler is FlatSampler { height_amp, .. }.
     // If you swap to a different sampler later, adjust this accessor.
     // Try downcasting via Any to fetch a reasonable default:

@@ -4,15 +4,8 @@ use crate::core::galaxy_camera::{GalaxyCamera, GalaxyCameraPlugin, MainCamera};
 use crate::core::planet_debug::PlanetDebugPlugin;
 use crate::core::skybox::{Skybox, SkyboxPlugin, StarfieldAssets};
 use crate::game::world::planet::{
-    spawn_random_planet_inner,
-    sync_planet_material_debug,
-    toggle_planet_wireframe,
-    update_planet_lod,
-    PlanetDebugConfig,
-    PlanetParams,
-    PlanetSettings,
-    PlanetSurfaceMaterial,
-    PlanetSurfaceParams, // <-- add
+    spawn_random_planet_inner, sync_planet_material_debug, toggle_planet_wireframe,
+    update_planet_lod, PlanetDebugConfig, PlanetParams, PlanetSettings, PlanetSurfaceMaterial,
 };
 use crate::game::world::sampling::FlatSamplerRes;
 use crate::game::world::terrain::MapSettings;
@@ -21,16 +14,12 @@ use bevy::{
     pbr::{wireframe::WireframePlugin, MaterialPlugin, StandardMaterial},
     prelude::*,
     render::{
-        render_resource::AsBindGroup,
-        renderer::RenderDevice,
-        Render,
-        RenderApp,
-        RenderSystems,
+        render_resource::AsBindGroup, renderer::RenderDevice, Render, RenderApp, RenderSystems,
     },
 };
 
-pub mod world;
 pub mod ui;
+pub mod world;
 
 #[derive(Component)]
 pub struct InGameRoot;
@@ -43,6 +32,52 @@ struct SunLight {
 
 const SUN_BASE_PITCH: f32 = -0.9;
 const SUN_BASE_YAW: f32 = 0.7;
+const SUN_LIGHT_ILLUMINANCE: f32 = 90_000.0;
+const SUN_POINT_INTENSITY: f32 = 2.5e8;
+const SUN_POINT_RANGE_FACTOR: f32 = 12.0;
+const SUN_DISTANCE_FACTOR: f32 = 3.6;
+const SUN_DISTANCE_MIN: f32 = 5_000.0;
+const SUN_DISTANCE_MAX_FACTOR: f32 = 12.0;
+const SUN_RADIUS_FACTOR: f32 = 0.28;
+const SUN_RADIUS_MIN: f32 = 1_000.0;
+const SUN_RADIUS_MAX_FACTOR: f32 = 4.0;
+
+#[derive(Resource, Clone, Copy, Debug)]
+pub struct SunSettings {
+    pub brightness: f32,
+}
+
+impl Default for SunSettings {
+    fn default() -> Self {
+        Self { brightness: 0.10 }
+    }
+}
+
+impl SunSettings {
+    #[inline]
+    fn directional_illuminance(self) -> f32 {
+        SUN_LIGHT_ILLUMINANCE * self.brightness.max(0.0)
+    }
+
+    #[inline]
+    fn point_intensity(self) -> f32 {
+        SUN_POINT_INTENSITY * self.brightness.max(0.0)
+    }
+}
+
+fn sun_visual_distance(radius: f32) -> f32 {
+    let base = radius.max(1.0);
+    let max_distance = (base * SUN_DISTANCE_MAX_FACTOR).max(SUN_DISTANCE_MIN);
+    let min_distance = SUN_DISTANCE_MIN.min(max_distance);
+    (base * SUN_DISTANCE_FACTOR).clamp(min_distance, max_distance)
+}
+
+fn sun_visual_radius(radius: f32) -> f32 {
+    let base = radius.max(1.0);
+    let max_radius = (base * SUN_RADIUS_MAX_FACTOR).max(SUN_RADIUS_MIN);
+    let min_radius = SUN_RADIUS_MIN.min(max_radius);
+    (base * SUN_RADIUS_FACTOR).clamp(min_radius, max_radius)
+}
 
 pub struct GamePlugin;
 impl Plugin for GamePlugin {
@@ -51,6 +86,7 @@ impl Plugin for GamePlugin {
             .init_resource::<PlanetParams>()
             .init_resource::<FlatSamplerRes>()
             .init_resource::<PlanetDebugConfig>()
+            .init_resource::<SunSettings>()
             .add_plugins(MaterialPlugin::<PlanetSurfaceMaterial>::default())
             .add_plugins(WireframePlugin::default())
             .add_plugins(PlanetDebugPlugin)
@@ -64,6 +100,7 @@ impl Plugin for GamePlugin {
                     sync_planet_material_debug,
                     toggle_planet_wireframe,
                     sync_sun_with_planet_rotation,
+                    apply_sun_settings,
                 )
                     .run_if(in_state(AppState::InGame)),
             )
@@ -110,10 +147,13 @@ fn setup_world(
     debug: Res<PlanetDebugConfig>,
     starfield: Res<StarfieldAssets>,
     existing_camera: Query<Entity, With<MainCamera>>,
-    mut existing_light: Query<(Entity, &mut Transform, Option<&SunLight>), With<DirectionalLight>>,
+    mut existing_light: Query<
+        (&mut DirectionalLight, &mut PointLight, &mut Transform),
+        With<SunLight>,
+    >,
     existing_skybox: Query<(), With<Skybox>>,
+    sun_settings: Res<SunSettings>,
 ) {
-    
     sampler_res.0.seed = map.seed;
 
     spawn_random_planet_inner(
@@ -130,29 +170,92 @@ fn setup_world(
     info!("spawned planet with radius {}", params.radius);
 
     let target_rotation = sun_rotation_from_params(params.rotation_deg);
-    if let Some((entity, mut transform, has_component)) = existing_light.iter_mut().next() {
-        transform.rotation = target_rotation;
-        if has_component.is_none() {
-            commands.entity(entity).insert(SunLight {
-                base_pitch: SUN_BASE_PITCH,
-                base_yaw: SUN_BASE_YAW,
-            });
-        }
+
+    let sun_color = Color::srgb(1.0, 0.93, 0.78);
+    let sun_emissive = sun_color.to_linear() * 6.5;
+    let sun_distance = sun_visual_distance(params.radius);
+    let sun_radius = sun_visual_radius(params.radius);
+    let sun_scale = Vec3::splat(sun_radius);
+    let sun_point_range = sun_distance * SUN_POINT_RANGE_FACTOR;
+    let dir_illuminance = sun_settings.directional_illuminance();
+    let point_intensity = sun_settings.point_intensity();
+
+    let compute_sun_translation = |rotation: Quat| {
+        let direction = rotation.mul_vec3(-Vec3::Z);
+        -direction * sun_distance
+    };
+
+    if let Some((mut dir_light, mut point_light, mut transform)) = existing_light.iter_mut().next()
+    {
+        dir_light.color = sun_color;
+        dir_light.illuminance = dir_illuminance;
+        dir_light.shadows_enabled = true;
+
+        point_light.color = sun_color;
+        point_light.intensity = point_intensity;
+        point_light.range = sun_point_range;
+        point_light.radius = (sun_radius * 0.5).max(1.0);
+        point_light.shadows_enabled = false;
+
+        let translation = compute_sun_translation(target_rotation);
+        let to_planet = (-translation).normalize_or_zero();
+        let rotation = if to_planet.length_squared() > 0.0 {
+            Quat::from_rotation_arc(Vec3::NEG_Z, to_planet)
+        } else {
+            Quat::IDENTITY
+        };
+
+        transform.translation = translation;
+        transform.scale = sun_scale;
+        transform.rotation = rotation;
     } else {
+        let translation = compute_sun_translation(target_rotation);
+        let mesh = meshes.add(Sphere::new(1.0));
+        let material = standard_materials.add(StandardMaterial {
+            base_color: sun_color,
+            emissive: sun_emissive,
+            unlit: true,
+            ..default()
+        });
+        let to_planet = (-translation).normalize_or_zero();
+        let sun_rotation = if to_planet.length_squared() > 0.0 {
+            Quat::from_rotation_arc(Vec3::NEG_Z, to_planet)
+        } else {
+            Quat::IDENTITY
+        };
+
         commands.spawn((
-            DirectionalLight {
-                shadows_enabled: true,
-                illuminance: 25_000.0,
-                ..default()
-            },
-            Transform::from_rotation(target_rotation),
             SunLight {
                 base_pitch: SUN_BASE_PITCH,
                 base_yaw: SUN_BASE_YAW,
             },
+            DirectionalLight {
+                color: sun_color,
+                shadows_enabled: true,
+                illuminance: dir_illuminance,
+                ..default()
+            },
+            PointLight {
+                color: sun_color,
+                intensity: point_intensity,
+                range: sun_point_range,
+                radius: (sun_radius * 0.5).max(1.0),
+                shadows_enabled: false,
+                ..default()
+            },
+            Mesh3d(mesh),
+            MeshMaterial3d(material),
+            Transform {
+                translation,
+                rotation: sun_rotation,
+                scale: sun_scale,
+            },
+            GlobalTransform::default(),
+            Visibility::Visible,
+            InheritedVisibility::default(),
             Name::new("Sun"),
         ));
-        info!("spawned directional light");
+        info!("spawned sun light");
     }
 
     let camera_entity = if let Some(entity) = existing_camera.iter().next() {
@@ -200,16 +303,70 @@ fn setup_world(
 
 fn sync_sun_with_planet_rotation(
     params: Res<PlanetParams>,
-    mut lights: Query<(&SunLight, &mut Transform), With<DirectionalLight>>,
+    sun_settings: Res<SunSettings>,
+    mut lights: Query<(
+        &SunLight,
+        &mut Transform,
+        &mut DirectionalLight,
+        &mut PointLight,
+    )>,
 ) {
     if !params.is_changed() {
         return;
     }
 
-    for (sun, mut transform) in &mut lights {
+    let distance = sun_visual_distance(params.radius);
+    let radius = sun_visual_radius(params.radius);
+    let scale = Vec3::splat(radius);
+
+    let dir_illuminance = sun_settings.directional_illuminance();
+    let point_intensity = sun_settings.point_intensity();
+
+    for (sun, mut transform, mut dir_light, mut point_light) in &mut lights {
         let yaw = sun.base_yaw + params.rotation_deg.to_radians();
         let rotation = Quat::from_euler(EulerRot::XYZ, sun.base_pitch, yaw, 0.0);
-        transform.rotation = rotation;
+        let direction = rotation.mul_vec3(-Vec3::Z);
+        let translation = -direction * distance;
+        let to_planet = (-translation).normalize_or_zero();
+
+        transform.translation = translation;
+        transform.scale = scale;
+        transform.rotation = if to_planet.length_squared() > 0.0 {
+            Quat::from_rotation_arc(Vec3::NEG_Z, to_planet)
+        } else {
+            Quat::IDENTITY
+        };
+        dir_light.color = Color::srgb(1.0, 0.93, 0.78);
+        dir_light.illuminance = dir_illuminance;
+        dir_light.shadows_enabled = true;
+
+        point_light.color = Color::srgb(1.0, 0.93, 0.78);
+        point_light.intensity = point_intensity;
+        point_light.range = distance * SUN_POINT_RANGE_FACTOR;
+        point_light.radius = (radius * 0.5).max(1.0);
+        point_light.shadows_enabled = false;
+    }
+}
+
+fn apply_sun_settings(
+    sun_settings: Res<SunSettings>,
+    mut lights: Query<(&mut DirectionalLight, &mut PointLight, &Transform), With<SunLight>>,
+) {
+    if !sun_settings.is_changed() {
+        return;
+    }
+    let dir_illuminance = sun_settings.directional_illuminance();
+    let point_intensity = sun_settings.point_intensity();
+    for (mut dir_light, mut point_light, transform) in &mut lights {
+        dir_light.color = Color::srgb(1.0, 0.93, 0.78);
+        dir_light.illuminance = dir_illuminance;
+        dir_light.shadows_enabled = true;
+
+        point_light.color = Color::srgb(1.0, 0.93, 0.78);
+        point_light.intensity = point_intensity;
+        point_light.range = transform.translation.length() * SUN_POINT_RANGE_FACTOR;
+        point_light.radius = (transform.scale.x * 0.5).max(1.0);
+        point_light.shadows_enabled = false;
     }
 }
 

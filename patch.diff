@@ -1,0 +1,149 @@
+*** Begin Patch
+*** Update File: src/game/world/planet.rs
+@@
+-        // Near surface we want maximum tessellation, progressively dropping detail
+-        // as the camera pulls away. These thresholds are expressed relative to the
+-        // planet radius so larger worlds scale automatically.
+-        const ALTITUDE_BANDS: [f32; 5] = [0.002, 0.008, 0.02, 0.05, 0.12];
+-        const ALTITUDE_MARGINS: [f32; 5] = [
+-            ALTITUDE_BANDS[0] * 0.01 + 0.00005,
+-            ALTITUDE_BANDS[1] * 0.01 + 0.0001,
+-            ALTITUDE_BANDS[2] * 0.01 + 0.0002,
+-            ALTITUDE_BANDS[3] * 0.01 + 0.0003,
+-            ALTITUDE_BANDS[4] * 0.01 + 0.0005,
+-        ];
+-        const LOD_LEVELS: [u32; 6] = [7, 6, 5, 4, 3, 2];
+-
+-        let desired_idx = if altitude_ratio <= ALTITUDE_BANDS[0] {
+-            0
+-        } else if altitude_ratio <= ALTITUDE_BANDS[1] {
+-            1
+-        } else if altitude_ratio <= ALTITUDE_BANDS[2] {
+-            2
+-        } else if altitude_ratio <= ALTITUDE_BANDS[3] {
+-            3
+-        } else if altitude_ratio <= ALTITUDE_BANDS[4] {
+-            4
+-        } else {
+-            5
+-        };
+-
+-        let current_idx = match lod.level {
+-            7 => 0,
+-            6 => 1,
+-            5 => 2,
+-            4 => 3,
+-            3 => 4,
+-            _ => 5,
+-        };
+-
+-        if desired_idx != current_idx {
+-            let mut allow_switch = false;
+-
+-            if desired_idx < current_idx {
+-                let boundary = ALTITUDE_BANDS[desired_idx];
+-                let margin = ALTITUDE_MARGINS[desired_idx];
+-                allow_switch = altitude_ratio <= (boundary - margin).max(0.0);
+-            } else if desired_idx > current_idx {
+-                if current_idx < ALTITUDE_BANDS.len() {
+-                    let boundary = ALTITUDE_BANDS[current_idx];
+-                    let margin = ALTITUDE_MARGINS[current_idx];
+-                    allow_switch = altitude_ratio >= boundary + margin;
+-                }
+-            }
+-
+-            if allow_switch {
+-                let target = LOD_LEVELS[desired_idx];
+-                if lod.level != target {
+-                    lod.level = target;
+-                    info!("Planet LOD switched to level {}", lod.level);
+-
+-                    if let Some(mesh) = meshes.get_mut(&mesh_h.0) {
+-                        let new = build_colored_planet_mesh_with_subdiv(
+-                            lod.level,
+-                            &sampler_res,
+-                            &params,
+-                            &settings,
+-                            debug.mode,
+-                        );
+-                        if let Some(positions) = new.attribute(Mesh::ATTRIBUTE_POSITION) {
+-                            mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions.clone());
+-                        }
+-                        if let Some(normals) = new.attribute(Mesh::ATTRIBUTE_NORMAL) {
+-                            mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals.clone());
+-                        }
+-                        if let Some(colors) = new.attribute(Mesh::ATTRIBUTE_COLOR) {
+-                            mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors.clone());
+-                        }
+-                        if let Some(uvs) = new.attribute(Mesh::ATTRIBUTE_UV_0) {
+-                            mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs.clone());
+-                        }
+-                        if let Some(uvs1) = new.attribute(Mesh::ATTRIBUTE_UV_1) {
+-                            mesh.insert_attribute(Mesh::ATTRIBUTE_UV_1, uvs1.clone());
+-                        }
+-                        if let Some(tangents) = new.attribute(Mesh::ATTRIBUTE_TANGENT) {
+-                            mesh.insert_attribute(Mesh::ATTRIBUTE_TANGENT, tangents.clone());
+-                        }
+-                        if let Some(idx) = new.indices().cloned() {
+-                            mesh.insert_indices(idx);
+-                        }
+-                    }
+-                }
+-            }
+-        }
++        // Near surface we want maximum tessellation, progressively dropping detail
++        // as the camera pulls away. These thresholds are expressed relative to the
++        // planet radius so larger worlds scale automatically and align with the
++        // debug rings in the scene.
++        const ALTITUDE_BANDS: [f32; 5] = [0.002, 0.008, 0.02, 0.05, 0.12];
++
++        let desired = if altitude_ratio <= ALTITUDE_BANDS[0] {
++            7
++        } else if altitude_ratio <= ALTITUDE_BANDS[1] {
++            6
++        } else if altitude_ratio <= ALTITUDE_BANDS[2] {
++            5
++        } else if altitude_ratio <= ALTITUDE_BANDS[3] {
++            4
++        } else if altitude_ratio <= ALTITUDE_BANDS[4] {
++            3
++        } else {
++            2
++        };
++
++        if desired != lod.level {
++            lod.level = desired;
++            info!("Planet LOD switched to level {}", lod.level);
++
++            if let Some(mesh) = meshes.get_mut(&mesh_h.0) {
++                let new = build_colored_planet_mesh_with_subdiv(
++                    lod.level,
++                    &sampler_res,
++                    &params,
++                    &settings,
++                    debug.mode,
++                );
++                if let Some(positions) = new.attribute(Mesh::ATTRIBUTE_POSITION) {
++                    mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions.clone());
++                }
++                if let Some(normals) = new.attribute(Mesh::ATTRIBUTE_NORMAL) {
++                    mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals.clone());
++                }
++                if let Some(colors) = new.attribute(Mesh::ATTRIBUTE_COLOR) {
++                    mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors.clone());
++                }
++                if let Some(uvs) = new.attribute(Mesh::ATTRIBUTE_UV_0) {
++                    mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs.clone());
++                }
++                if let Some(uvs1) = new.attribute(Mesh::ATTRIBUTE_UV_1) {
++                    mesh.insert_attribute(Mesh::ATTRIBUTE_UV_1, uvs1.clone());
++                }
++                if let Some(tangents) = new.attribute(Mesh::ATTRIBUTE_TANGENT) {
++                    mesh.insert_attribute(Mesh::ATTRIBUTE_TANGENT, tangents.clone());
++                }
++                if let Some(idx) = new.indices().cloned() {
++                    mesh.insert_indices(idx);
++                }
++            }
++        }
+*** End Patch

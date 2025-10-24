@@ -509,7 +509,7 @@ fn fragment(vertex_output: VertexOutput, @builtin(front_facing) is_front: bool) 
     var normal = normalize(pbr_input.N);
     var grad = detail.grad * (material.normal_strength * 0.9);
     grad = grad - normal * dot(normal, grad);
-    normal = normalize(normal - grad);
+    normal = normalize(normal + grad);
 
     let sun_dir = normalize(vec3(0.32, 0.78, 0.54));
     let night_tint = vec3(0.08, 0.09, 0.12);
@@ -555,10 +555,13 @@ fn fragment(vertex_output: VertexOutput, @builtin(front_facing) is_front: bool) 
         let high_altitude = smoothstep(material.rock_start + 0.12, 0.98, elev01);
         let cold_factor = clamp((0.26 - temperature) / 0.26, 0.0, 1.0);
         let moisture_factor = clamp((moisture - 0.55) / 0.45, 0.0, 1.0);
-        let allow_alpine = (high_altitude > 0.6) && (cold_factor > 0.6) && (moisture_factor > 0.4);
+        let snow_temp_factor = clamp((0.45 - temperature) / 0.25, 0.0, 1.0);
+        let allow_alpine =
+            (snow_temp_factor > 0.0) && (high_altitude > 0.6) && (cold_factor > 0.6) && (moisture_factor > 0.4);
+        let effective_snow = snow_score * snow_temp_factor;
 
-        if snow_score > 0.62 && (lat_abs > 0.88 || allow_alpine) {
-            let snow_k = clamp((snow_score - 0.62) / 0.38, 0.0, 1.0);
+        if effective_snow > 0.62 && (lat_abs > 0.88 || allow_alpine) {
+            let snow_k = clamp((effective_snow - 0.62) / 0.38, 0.0, 1.0);
             let snow_variation =
                 fbm3_with_derivative(
                     material.seed ^ 0xC5u,

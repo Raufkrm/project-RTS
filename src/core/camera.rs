@@ -182,17 +182,6 @@ fn despawn_existing_cameras(mut commands: Commands, cams: Query<Entity, With<Cam
 }
 
 fn spawn_camera(mut commands: Commands, planet: Option<Res<PlanetParams>>) {
-    // Sun
-    commands.spawn((
-        DirectionalLight {
-            shadows_enabled: true,
-            illuminance: 25_000.0,
-            ..default()
-        },
-        Transform::from_rotation(Quat::from_euler(EulerRot::XYZ, -0.9, 0.7, 0.0)),
-        Name::new("Sun"),
-    ));
-
     // Start near surface on +Z with cinematic tilt
     let r = planet.as_ref().map(|p| p.radius).unwrap_or(6.0);
     let start_alt = 8.0;
@@ -214,8 +203,8 @@ fn spawn_camera(mut commands: Commands, planet: Option<Res<PlanetParams>>) {
             far_at_radii: 3.0,
         },
         AmbientLight {
-            color: Color::srgb(0.25, 0.25, 0.30),
-            brightness: 500.0,
+            color: Color::srgb(0.12, 0.14, 0.22),
+            brightness: 140.0,
             affects_lightmapped_meshes: true,
         },
         ScaledWheelZoom {
@@ -244,12 +233,8 @@ fn spawn_camera(mut commands: Commands, planet: Option<Res<PlanetParams>>) {
     ));
 }
 
-fn despawn_camera(
-    mut commands: Commands,
-    q_cam: Query<Entity, With<GameCamera>>,
-    q_light: Query<Entity, With<DirectionalLight>>,
-) {
-    for e in q_cam.iter().chain(q_light.iter()) {
+fn despawn_camera(mut commands: Commands, q_cam: Query<Entity, With<GameCamera>>) {
+    for e in &q_cam {
         commands.entity(e).despawn();
     }
 }

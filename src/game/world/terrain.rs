@@ -1,13 +1,10 @@
 //! Smooth heightmapped terrain + water plane for Bevy 0.17,
 //! with reroll (press R) + randomized/locally-varying water level.
 
-use crate::core::camera::EditorCamera;
-use crate::game::world::patch::{Patch, PatchGrid, PatchId};
-use crate::game::world::sampling::{FlatSamplerRes, Sample, WorldSampler};
+use crate::game::world::patch::PatchId;
 use crate::game::InGameRoot;
 use bevy::asset::RenderAssetUsages;
 use bevy::mesh::Indices;
-use bevy::prelude::*;
 use bevy::prelude::*;
 use bevy::render::render_resource::PrimitiveTopology;
 use std::time::{SystemTime, UNIX_EPOCH};
