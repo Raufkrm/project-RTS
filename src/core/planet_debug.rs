@@ -13,7 +13,8 @@ impl Plugin for PlanetDebugPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<LodDebugBands>()
             .insert_resource(LodDebugBands {
-                radii: vec![1.2, 2.0, 3.5, 5.0],
+                // scale multipliers relative to the planet radius (1.0 = surface)
+                radii: vec![1.20, 1.68, 3.60, 5.40],
             })
             .add_systems(Update, (draw_lod_bands, cycle_debug_mode));
     }

@@ -6,6 +6,7 @@ use bevy::prelude::*;
 use bevy::ui::RelativeCursorPosition;
 
 use crate::app::AppState;
+use crate::core::galaxy_camera::MainCamera;
 use crate::game::world::planet::{
     analyze_planet_climate, apply_guardrail_adjustment, guardrail_adjustment_from_summaries,
     guardrail_adjustment_from_summary, log_planet_configuration, spawn_random_planet_inner,
@@ -14,7 +15,7 @@ use crate::game::world::planet::{
 };
 use crate::game::world::sampling::FlatSamplerRes;
 use crate::game::world::terrain::{MapRoot, MapSettings};
-use crate::game::SunSettings;
+use crate::game::{SunDirection, SunSettings};
 
 pub struct DevPanelPlugin;
 
@@ -66,6 +67,8 @@ struct DevPanelState {
     mountain_strength: f32,
     rotation_deg: f32,
     sun_brightness: f32,
+    camera_altitude: f32,
+    zoom_ratio: f32,
 
     dirty: bool,
     active_slider: Option<ParameterKind>,
@@ -88,6 +91,8 @@ impl Default for DevPanelState {
             mountain_strength: 0.0,
             rotation_deg: 0.0,
             sun_brightness: 0.10,
+            camera_altitude: 0.0,
+            zoom_ratio: 1.0,
             dirty: false,
             active_slider: None,
             active_input: None,
@@ -373,6 +378,8 @@ fn spawn_dev_panel(
     state.mountain_strength = settings.mountain_strength;
     state.rotation_deg = slider_angle_from_resource(params.rotation_deg);
     state.sun_brightness = sun_settings.brightness;
+    state.camera_altitude = 0.0;
+    state.zoom_ratio = 1.0;
 
     let font = asset_server.load("fonts/arial.ttf");
 
@@ -405,7 +412,7 @@ fn spawn_dev_panel(
             ));
 
             panel.spawn((
-                Text::new("FPS: --"),
+                Text::new("FPS: -- | Alt: -- km | Zoom: --"),
                 TextFont {
                     font: font.clone(),
                     font_size: 16.0,
@@ -653,8 +660,11 @@ fn toggle_panel_visibility(
 
 fn update_fps_display(
     time: Res<Time>,
+    params: Res<PlanetParams>,
     mut state: ResMut<DevPanelState>,
     mut fps_text: Query<&mut Text, With<FpsText>>,
+    q_cam: Query<&GlobalTransform, With<MainCamera>>,
+    q_planet: Query<&GlobalTransform, With<PlanetTag>>,
 ) {
     let dt = time.delta_secs();
     if dt > 0.0 {
@@ -667,8 +677,21 @@ fn update_fps_display(
         };
     }
 
+    if let (Some(cam_tf), Some(planet_tf)) = (q_cam.iter().next(), q_planet.iter().next()) {
+        let center = planet_tf.translation();
+        let dist = cam_tf.translation().distance(center);
+        let radius = params.radius.max(1.0);
+        let altitude = (dist - radius).max(0.0);
+        state.camera_altitude = altitude;
+        state.zoom_ratio = (dist / radius).max(1.0);
+    }
+
     if let Ok(mut text) = fps_text.single_mut() {
-        text.0 = format!("FPS: {:.1}", state.fps_smooth);
+        let alt_km = state.camera_altitude / 1000.0;
+        text.0 = format!(
+            "FPS: {:.1} | Alt: {:.1} km | Zoom: {:.2}x",
+            state.fps_smooth, alt_km, state.zoom_ratio
+        );
     }
 }
 
@@ -1011,6 +1034,7 @@ fn apply_changes(
     mut planet_params: ResMut<PlanetParams>,
     mut planet_settings: ResMut<PlanetSettings>,
     mut sun_settings: ResMut<SunSettings>,
+    sun_direction: Res<SunDirection>,
     debug: Res<PlanetDebugConfig>,
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -1117,6 +1141,7 @@ fn apply_changes(
         &*planet_params,
         &*planet_settings,
         &*debug,
+        &*sun_direction,
     );
 }
 

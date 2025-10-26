@@ -31,6 +31,7 @@ struct PlanetSurfaceUniform {
     reflectance: f32,
     rock_start: f32,
     snow_start: f32,
+    sun_dir: vec4<f32>,
     water_deep: vec4<f32>,
     water_shallow: vec4<f32>,
     land_sand: vec4<f32>,
@@ -504,14 +505,19 @@ fn fragment(vertex_output: VertexOutput, @builtin(front_facing) is_front: bool) 
     let depth = clamp((material.sea_level - height01) / max(material.sea_level, 1e-3), 0.0, 1.0);
     let elev01 = clamp((height01 - material.sea_level) / max(1.0 - material.sea_level, 1e-3), 0.0, 1.0);
     let shore_mix = pow(max(1.0 - depth, 0.0), 0.6);
-    let polar_cap = smoothstep(0.88, 1.0, lat_abs);
 
     var normal = normalize(pbr_input.N);
     var grad = detail.grad * (material.normal_strength * 0.9);
     grad = grad - normal * dot(normal, grad);
     normal = normalize(normal + grad);
 
-    let sun_dir = normalize(vec3(0.32, 0.78, 0.54));
+    var sun_dir = material.sun_dir.xyz;
+    let sun_dir_len = length(sun_dir);
+    if sun_dir_len > 1e-4 {
+        sun_dir = sun_dir / sun_dir_len;
+    } else {
+        sun_dir = normalize(vec3(0.32, 0.78, 0.54));
+    }
     let night_tint = vec3(0.08, 0.09, 0.12);
     let dawn_tint = vec3(0.14, 0.15, 0.18);
     let sun_ndotl = clamp(dot(normal, sun_dir), 0.0, 1.0);
@@ -551,34 +557,6 @@ fn fragment(vertex_output: VertexOutput, @builtin(front_facing) is_front: bool) 
         let rock_k = clamp((elev01 - material.rock_start) / rock_span, 0.0, 1.0);
         let to_rock = clamp(rock_k * 0.75 + slope_to_rock * 0.55, 0.0, 1.0);
         color = mix(color, material.land_rock.xyz, to_rock);
-
-        let high_altitude = smoothstep(material.rock_start + 0.12, 0.98, elev01);
-        let cold_factor = clamp((0.26 - temperature) / 0.26, 0.0, 1.0);
-        let moisture_factor = clamp((moisture - 0.55) / 0.45, 0.0, 1.0);
-        let snow_temp_factor = clamp((0.45 - temperature) / 0.25, 0.0, 1.0);
-        let allow_alpine =
-            (snow_temp_factor > 0.0) && (high_altitude > 0.6) && (cold_factor > 0.6) && (moisture_factor > 0.4);
-        let effective_snow = snow_score * snow_temp_factor;
-
-        if effective_snow > 0.62 && (lat_abs > 0.88 || allow_alpine) {
-            let snow_k = clamp((effective_snow - 0.62) / 0.38, 0.0, 1.0);
-            let snow_variation =
-                fbm3_with_derivative(
-                    material.seed ^ 0xC5u,
-                    unit.x * 6.2,
-                    unit.y * 6.0,
-                    unit.z * 6.3,
-                    material.detail_freq * 1.7,
-                ).value;
-            let cold_bleach =
-                mix(vec3(0.93, 0.96, 1.0), vec3(0.82, 0.86, 0.91), snow_variation);
-            let polar_snow = mix(
-                material.land_snow.xyz,
-                cold_bleach,
-                polar_cap * 0.6 + snow_variation * 0.4,
-            );
-            color = mix(color, polar_snow, snow_k);
-        }
 
         let lush_factor = pow(moisture * (1.0 - dryness), 1.4);
         let grass_variation =

@@ -1,3 +1,5 @@
+use crate::core::planet_debug::LodDebugBands;
+use crate::game::SunDirection;
 use crate::game::world::sampling::FlatSamplerRes;
 use crate::game::world::terrain::MapSettings;
 use bevy::asset::RenderAssetUsages;
@@ -9,15 +11,13 @@ use bevy::render::alpha::AlphaMode;
 use bevy::render::render_resource::{AsBindGroup, PrimitiveTopology, ShaderType};
 use bevy::shader::ShaderRef; // correct place for your Bevy version
 use bevy_mesh::{Indices, Mesh, VertexAttributeValues};
+use std::cmp::Ordering;
 
 // -----------------------------------------------------------------------------
 // Tags / params
 // -----------------------------------------------------------------------------
 #[derive(Component)]
 pub struct PlanetTag;
-
-#[derive(Component)]
-pub struct CloudLayer;
 
 #[derive(Asset, AsBindGroup, TypePath, Clone)]
 pub struct PlanetSurfaceParams {
@@ -51,6 +51,7 @@ pub struct PlanetSurfaceUniform {
     pub reflectance: f32,
     pub rock_start: f32,
     pub snow_start: f32,
+    pub sun_dir: Vec4,
     pub water_deep: Vec4,
     pub water_shallow: Vec4,
     pub land_sand: Vec4,
@@ -64,6 +65,7 @@ pub type PlanetSurfaceMaterial =
 
 impl Default for PlanetSurfaceParams {
     fn default() -> Self {
+        let default_sun = Vec3::new(0.32, 0.78, 0.54).normalize_or_zero();
         Self {
             params: PlanetSurfaceUniform {
                 seed: 0,
@@ -88,6 +90,7 @@ impl Default for PlanetSurfaceParams {
                 reflectance: 0.04,
                 rock_start: 0.54,
                 snow_start: 0.82,
+                sun_dir: default_sun.extend(0.0),
                 water_deep: srgb_to_linear_vec3(Vec3::new(0.04, 0.11, 0.28)).extend(1.0),
                 water_shallow: srgb_to_linear_vec3(Vec3::new(0.27, 0.56, 0.78)).extend(1.0),
                 land_sand: srgb_to_linear_vec3(Vec3::new(0.88, 0.78, 0.52)).extend(1.0),
@@ -120,10 +123,12 @@ impl PlanetSurfaceParams {
         seed: u64,
         params: &PlanetParams,
         settings: &PlanetSettings,
+        sun_dir: Vec3,
         debug_mode: PlanetDebugMode,
     ) -> Self {
         let seed_mix = (seed as u32) ^ ((seed >> 32) as u32);
         let climate = ClimateModel::new(seed, params, settings);
+        let dir = sun_dir.normalize_or_zero();
         Self {
             params: PlanetSurfaceUniform {
                 seed: seed_mix,
@@ -148,6 +153,7 @@ impl PlanetSurfaceParams {
                 reflectance: 0.04,
                 rock_start: settings.rock_start,
                 snow_start: settings.snow_start,
+                sun_dir: dir.extend(0.0),
                 water_deep: srgb_to_linear_vec3(settings.water_deep).extend(1.0),
                 water_shallow: srgb_to_linear_vec3(settings.water_shallow).extend(1.0),
                 land_sand: srgb_to_linear_vec3(settings.land_sand).extend(1.0),
@@ -432,7 +438,12 @@ impl<'a> ClimateModel<'a> {
         let warped = unit + warp_offset * self.warp_amp;
 
         let center_sample = self.sample_fields(warped);
-        let height01 = self.compose_height(&center_sample);
+        let mut height01 = self.compose_height(&center_sample);
+        if center_sample.land_mask > 0.5 {
+            let inland = ((center_sample.land_mask - 0.5) / 0.5).clamp(0.0, 1.0);
+            let uplift = inland.powf(1.35) * 0.08;
+            height01 = height01.max((self.sea_level + uplift).min(0.99));
+        }
 
         let eps = 0.012;
         let sample_px = self.sample_fields(warped + Vec3::new(eps, 0.0, 0.0));
@@ -856,6 +867,7 @@ pub fn spawn_random_planet_inner(
     params: &PlanetParams,
     settings: &PlanetSettings,
     debug: &PlanetDebugConfig,
+    sun_direction: &SunDirection,
 ) {
     log_planet_configuration(
         "spawn_random_planet_inner",
@@ -874,6 +886,7 @@ pub fn spawn_random_planet_inner(
         map,
         params,
         settings,
+        sun_direction,
         debug,
     );
 }
@@ -890,6 +903,7 @@ pub fn spawn_random_planet_with_settings_system(
     params: Res<PlanetParams>,
     settings: Res<PlanetSettings>,
     debug: Res<PlanetDebugConfig>,
+    sun_direction: Res<SunDirection>,
 ) {
     log_planet_configuration(
         "spawn_random_planet_with_settings_system",
@@ -908,6 +922,7 @@ pub fn spawn_random_planet_with_settings_system(
         &map,
         &params,
         &settings,
+        &*sun_direction,
         &debug,
     );
 }
@@ -921,6 +936,7 @@ fn spawn_planet_with_settings(
     _map: &MapSettings,
     params: &PlanetParams,
     settings: &PlanetSettings,
+    sun_direction: &SunDirection,
     debug: &PlanetDebugConfig,
 ) {
     let climate_summary = analyze_planet_climate(sampler_res.0.seed, params, settings);
@@ -944,7 +960,7 @@ fn spawn_planet_with_settings(
     let handle = meshes.add(land_mesh);
 
     let extension =
-        PlanetSurfaceParams::from_settings(sampler_res.0.seed, params, settings, debug.mode);
+        PlanetSurfaceParams::from_settings(sampler_res.0.seed, params, settings, sun_direction.0, debug.mode);
     let base_material = StandardMaterial {
         base_color: Color::WHITE,
         perceptual_roughness: extension.params.perceptual_roughness,
@@ -961,7 +977,7 @@ fn spawn_planet_with_settings(
     let planet_entity = commands
         .spawn((
             PlanetTag,
-            PlanetLod { level: 7 },
+            PlanetLod { level: 5 },
             Mesh3d(handle),
             MeshMaterial3d(planet_material.clone()),
             Transform::from_rotation(rotation),
@@ -972,30 +988,6 @@ fn spawn_planet_with_settings(
         ))
         .id();
 
-    let cloud_mesh = build_cloud_layer_mesh(settings, sampler_res, params);
-    let cloud_handle = meshes.add(cloud_mesh);
-    let cloud_material = standard_materials.add(StandardMaterial {
-        base_color: Color::srgba(0.95, 0.97, 1.0, 0.65),
-        alpha_mode: AlphaMode::Blend,
-        double_sided: true,
-        unlit: true,
-        perceptual_roughness: 0.1,
-        metallic: 0.0,
-        reflectance: 0.1,
-        ..default()
-    });
-    commands.entity(planet_entity).with_children(|parent| {
-        parent.spawn((
-            CloudLayer,
-            Mesh3d(cloud_handle),
-            MeshMaterial3d(cloud_material.clone()),
-            Transform::default(),
-            GlobalTransform::default(),
-            Visibility::default(),
-            InheritedVisibility::default(),
-            Name::new("CloudLayer"),
-        ));
-    });
 }
 pub fn auto_clip_planes(
     mut q_cam: Query<(&GlobalTransform, &mut Projection), With<Camera3d>>,
@@ -1068,17 +1060,23 @@ pub fn toggle_planet_wireframe(
     }
 }
 
-pub fn sync_planet_material_debug(
+pub fn sync_planet_material_uniforms(
     debug: Res<PlanetDebugConfig>,
+    sun_direction: Res<SunDirection>,
     mut materials: ResMut<Assets<PlanetSurfaceMaterial>>,
     q_planet: Query<&MeshMaterial3d<PlanetSurfaceMaterial>, With<PlanetTag>>,
 ) {
-    if !debug.is_changed() {
+    if !debug.is_changed() && !sun_direction.is_changed() {
         return;
     }
     for material_handle in &q_planet {
         if let Some(material) = materials.get_mut(&material_handle.0) {
-            material.extension.params.debug_mode = debug.mode as u32;
+            if debug.is_changed() {
+                material.extension.params.debug_mode = debug.mode as u32;
+            }
+            if sun_direction.is_changed() {
+                material.extension.params.sun_dir = sun_direction.as_vec4();
+            }
         }
     }
 }
@@ -1091,6 +1089,7 @@ pub fn update_planet_lod(
     sampler_res: Res<FlatSamplerRes>,
     _map: Res<MapSettings>,        // ok to keep; unused is fine for now
     settings: Res<PlanetSettings>, // <-- add this
+    lod_bands: Res<LodDebugBands>,
     debug: Res<PlanetDebugConfig>,
 ) {
     // single() single() in 0.18
@@ -1107,32 +1106,77 @@ pub fn update_planet_lod(
         let _altitude_ratio = altitude / radius;
 
         // Near surface we want maximum tessellation, progressively dropping detail
-        // as the camera pulls away. These thresholds are expressed relative to the
-        // planet radius so larger worlds scale automatically and align with the
-        // debug rings rendered in development builds.
-        const ALTITUDE_FACTORS: [f32; 5] = [0.002, 0.008, 0.02, 0.05, 0.12];
-        let ring_altitudes = ALTITUDE_FACTORS.map(|f| params.radius.max(1.0) * f);
+        // as the camera pulls away. These thresholds are aligned with the debug gizmo rings.
+        let mut ring_altitudes: Vec<f32> = lod_bands
+            .radii
+            .iter()
+            .copied()
+            .filter(|scale| *scale > 1.0 + f32::EPSILON)
+            .map(|scale| (scale - 1.0) * radius)
+            .collect();
+        if ring_altitudes.len() < 3 {
+            const FALLBACK_FRAC: [f32; 3] = [0.01, 0.05, 0.2];
+            ring_altitudes.extend(FALLBACK_FRAC.iter().map(|frac| radius * frac));
+        }
+        ring_altitudes.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal));
+        ring_altitudes.dedup_by(|a, b| (*a - *b).abs() < 1.0);
+        if ring_altitudes.len() < 3 {
+            continue;
+        }
+        let start = ring_altitudes.len() - 3;
+        let ring_altitudes = [
+            ring_altitudes[start],
+            ring_altitudes[start + 1],
+            ring_altitudes[start + 2],
+        ];
 
-        let desired = if altitude <= ring_altitudes[0] {
-            7
-        } else if altitude <= ring_altitudes[1] {
-            6
-        } else if altitude <= ring_altitudes[2] {
-            5
-        } else if altitude <= ring_altitudes[3] {
-            4
-        } else if altitude <= ring_altitudes[4] {
-            3
-        } else {
-            2
+        let hysteresis = |idx: usize| -> f32 {
+            let band = ring_altitudes[idx];
+            let mut value = band * 0.25;
+            value = value.max(params.height_amp * 0.08);
+            value = value.max(25.0);
+            value
         };
 
-        if desired != lod.level {
+        if lod.level > 5 {
+            lod.level = 5;
+        }
+        let mut target = lod.level;
+
+        match lod.level {
+            5 => {
+                if altitude > ring_altitudes[0] + hysteresis(0) {
+                    target = 4;
+                }
+            }
+            4 => {
+                if altitude < (ring_altitudes[0] - hysteresis(0)).max(0.0) {
+                    target = 5;
+                } else if altitude > ring_altitudes[1] + hysteresis(1) {
+                    target = 3;
+                }
+            }
+            3 => {
+                if altitude < (ring_altitudes[1] - hysteresis(1)).max(0.0) {
+                    target = 4;
+                } else if altitude > ring_altitudes[2] + hysteresis(2) {
+                    target = 2;
+                }
+            }
+            2 => {
+                if altitude < (ring_altitudes[2] - hysteresis(2)).max(0.0) {
+                    target = 3;
+                }
+            }
+            _ => {}
+        }
+
+        if target != lod.level {
             info!(
                 "Planet LOD switched to level {} (alt {:.1}, radius {:.1})",
-                desired, altitude, params.radius
+                target, altitude, radius
             );
-            lod.level = desired;
+            lod.level = target;
 
             if let Some(mesh) = meshes.get_mut(&mesh_h.0) {
                 let new = build_colored_planet_mesh_with_subdiv(
@@ -1167,6 +1211,7 @@ pub fn update_planet_lod(
         }
     }
 }
+
 #[inline]
 fn smoothstep(edge0: f32, edge1: f32, x: f32) -> f32 {
     let t = ((x - edge0) / (edge1 - edge0)).clamp(0.0, 1.0);
@@ -1190,50 +1235,6 @@ fn build_colored_planet_mesh(
     debug_mode: PlanetDebugMode,
 ) -> Mesh {
     build_colored_planet_mesh_with_subdiv(7, sampler_res, params, settings, debug_mode)
-}
-
-fn build_cloud_layer_mesh(
-    settings: &PlanetSettings,
-    sampler_res: &FlatSamplerRes,
-    params: &PlanetParams,
-) -> Mesh {
-    let subdiv = 5;
-    let (mut verts, indices_u32) = generate_icosphere(subdiv);
-    let climate = ClimateModel::new(sampler_res.0.seed ^ 0xCC11, params, settings);
-    let shell_offset = params.height_amp.max(1.0) * 0.18;
-    let base_radius = params.radius + shell_offset;
-
-    let mut colors: Vec<[f32; 4]> = Vec::with_capacity(verts.len());
-
-    for v in &mut verts {
-        let unit = v.normalize_or_zero();
-        let eval = climate.evaluate(unit);
-        let humidity = eval.moisture.clamp(0.0, 1.0);
-        let coverage =
-            (humidity.powf(1.2) * (1.0 - eval.dryness).powf(0.8) * (1.0 - eval.slope).powf(0.6))
-                .clamp(0.0, 1.0);
-        let coastal_boost = eval.coast_band * 0.35;
-        let alpha = (coverage * 0.75 + coastal_boost).clamp(0.05, 0.85);
-        let temp_factor = (1.0 - (eval.temperature - 0.55).abs() * 0.8).clamp(0.4, 1.0);
-        let brightness = 0.72 + 0.25 * temp_factor;
-        let color = Vec3::splat(brightness);
-
-        let altitude = eval.elev01 * params.height_amp * 0.05;
-        *v = unit * (base_radius + altitude);
-        colors.push([color.x, color.y, color.z, alpha]);
-    }
-
-    let normals: Vec<[f32; 3]> = compute_smooth_normals(&verts, &indices_u32);
-
-    let mut mesh = Mesh::new(
-        PrimitiveTopology::TriangleList,
-        RenderAssetUsages::RENDER_WORLD,
-    );
-    mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, verts);
-    mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
-    mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
-    mesh.insert_indices(Indices::U32(indices_u32));
-    mesh
 }
 
 #[inline]
@@ -1515,3 +1516,4 @@ fn compute_smooth_normals(verts: &[Vec3], indices: &[u32]) -> Vec<[f32; 3]> {
         })
         .collect()
 }
+

@@ -4,13 +4,13 @@ use crate::core::galaxy_camera::{GalaxyCamera, GalaxyCameraPlugin, MainCamera};
 use crate::core::planet_debug::PlanetDebugPlugin;
 use crate::core::skybox::{Skybox, SkyboxPlugin, StarfieldAssets};
 use crate::game::world::planet::{
-    spawn_random_planet_inner, sync_planet_material_debug, toggle_planet_wireframe,
+    spawn_random_planet_inner, sync_planet_material_uniforms, toggle_planet_wireframe,
     update_planet_lod, PlanetDebugConfig, PlanetParams, PlanetSettings, PlanetSurfaceMaterial,
 };
 use crate::game::world::sampling::FlatSamplerRes;
 use crate::game::world::terrain::MapSettings;
 use bevy::{
-    math::{primitives::Sphere, EulerRot, Quat, Vec3},
+    math::{primitives::Sphere, EulerRot, Quat, Vec3, Vec4},
     pbr::{wireframe::WireframePlugin, MaterialPlugin, StandardMaterial},
     prelude::*,
     render::{
@@ -87,6 +87,7 @@ impl Plugin for GamePlugin {
             .init_resource::<FlatSamplerRes>()
             .init_resource::<PlanetDebugConfig>()
             .init_resource::<SunSettings>()
+            .init_resource::<SunDirection>()
             .add_plugins(MaterialPlugin::<PlanetSurfaceMaterial>::default())
             .add_plugins(WireframePlugin::default())
             .add_plugins(PlanetDebugPlugin)
@@ -96,11 +97,13 @@ impl Plugin for GamePlugin {
             .add_systems(
                 Update,
                 (
+                    update_sun_direction_from_transform,
                     update_planet_lod,
-                    sync_planet_material_debug,
+                    sync_planet_material_uniforms,
                     toggle_planet_wireframe,
                     sync_sun_with_planet_rotation,
                     apply_sun_settings,
+                    enforce_sun_visibility,
                 )
                     .run_if(in_state(AppState::InGame)),
             )
@@ -148,26 +151,19 @@ fn setup_world(
     starfield: Res<StarfieldAssets>,
     existing_camera: Query<Entity, With<MainCamera>>,
     mut existing_light: Query<
-        (&mut DirectionalLight, &mut PointLight, &mut Transform),
+        (
+            &mut DirectionalLight,
+            &mut PointLight,
+            &mut Transform,
+            &mut Visibility,
+        ),
         With<SunLight>,
     >,
     existing_skybox: Query<(), With<Skybox>>,
     sun_settings: Res<SunSettings>,
+    mut sun_direction: ResMut<SunDirection>,
 ) {
     sampler_res.0.seed = map.seed;
-
-    spawn_random_planet_inner(
-        &mut commands,
-        &mut meshes,
-        &mut *planet_materials,
-        &mut *standard_materials,
-        &*sampler_res,
-        &map,
-        &params,
-        &settings,
-        &debug,
-    );
-    info!("spawned planet with radius {}", params.radius);
 
     let target_rotation = sun_rotation_from_params(params.rotation_deg);
 
@@ -180,12 +176,29 @@ fn setup_world(
     let dir_illuminance = sun_settings.directional_illuminance();
     let point_intensity = sun_settings.point_intensity();
 
-    let compute_sun_translation = |rotation: Quat| {
-        let direction = rotation.mul_vec3(-Vec3::Z);
-        -direction * sun_distance
-    };
+    let sun_direction_vec = target_rotation.mul_vec3(-Vec3::Z);
+    let sun_translation = -sun_direction_vec * sun_distance;
+    let dir_from_planet = sun_translation.normalize_or_zero();
+    if dir_from_planet.length_squared() > 0.0 {
+        sun_direction.0 = dir_from_planet;
+    }
 
-    if let Some((mut dir_light, mut point_light, mut transform)) = existing_light.iter_mut().next()
+    spawn_random_planet_inner(
+        &mut commands,
+        &mut meshes,
+        &mut *planet_materials,
+        &mut *standard_materials,
+        &*sampler_res,
+        &map,
+        &params,
+        &settings,
+        &debug,
+        &*sun_direction,
+    );
+    info!("spawned planet with radius {}", params.radius);
+
+    if let Some((mut dir_light, mut point_light, mut transform, mut visibility)) =
+        existing_light.iter_mut().next()
     {
         dir_light.color = sun_color;
         dir_light.illuminance = dir_illuminance;
@@ -197,7 +210,7 @@ fn setup_world(
         point_light.radius = (sun_radius * 0.5).max(1.0);
         point_light.shadows_enabled = false;
 
-        let translation = compute_sun_translation(target_rotation);
+        let translation = sun_translation;
         let to_planet = (-translation).normalize_or_zero();
         let rotation = if to_planet.length_squared() > 0.0 {
             Quat::from_rotation_arc(Vec3::NEG_Z, to_planet)
@@ -208,8 +221,9 @@ fn setup_world(
         transform.translation = translation;
         transform.scale = sun_scale;
         transform.rotation = rotation;
+        *visibility = Visibility::Visible;
     } else {
-        let translation = compute_sun_translation(target_rotation);
+        let translation = sun_translation;
         let mesh = meshes.add(Sphere::new(1.0));
         let material = standard_materials.add(StandardMaterial {
             base_color: sun_color,
@@ -304,6 +318,7 @@ fn setup_world(
 fn sync_sun_with_planet_rotation(
     params: Res<PlanetParams>,
     sun_settings: Res<SunSettings>,
+    mut sun_direction: ResMut<SunDirection>,
     mut lights: Query<(
         &SunLight,
         &mut Transform,
@@ -322,6 +337,7 @@ fn sync_sun_with_planet_rotation(
     let dir_illuminance = sun_settings.directional_illuminance();
     let point_intensity = sun_settings.point_intensity();
 
+    let mut new_direction = None;
     for (sun, mut transform, mut dir_light, mut point_light) in &mut lights {
         let yaw = sun.base_yaw + params.rotation_deg.to_radians();
         let rotation = Quat::from_euler(EulerRot::XYZ, sun.base_pitch, yaw, 0.0);
@@ -345,19 +361,35 @@ fn sync_sun_with_planet_rotation(
         point_light.range = distance * SUN_POINT_RANGE_FACTOR;
         point_light.radius = (radius * 0.5).max(1.0);
         point_light.shadows_enabled = false;
+
+        if translation.length_squared() > 0.0 && new_direction.is_none() {
+            new_direction = Some(translation.normalize());
+        }
+    }
+
+    if let Some(dir) = new_direction {
+        sun_direction.0 = dir;
     }
 }
 
 fn apply_sun_settings(
     sun_settings: Res<SunSettings>,
-    mut lights: Query<(&mut DirectionalLight, &mut PointLight, &Transform), With<SunLight>>,
+    mut lights: Query<
+        (
+            &mut DirectionalLight,
+            &mut PointLight,
+            &Transform,
+            &mut Visibility,
+        ),
+        With<SunLight>,
+    >,
 ) {
     if !sun_settings.is_changed() {
         return;
     }
     let dir_illuminance = sun_settings.directional_illuminance();
     let point_intensity = sun_settings.point_intensity();
-    for (mut dir_light, mut point_light, transform) in &mut lights {
+    for (mut dir_light, mut point_light, transform, mut visibility) in &mut lights {
         dir_light.color = Color::srgb(1.0, 0.93, 0.78);
         dir_light.illuminance = dir_illuminance;
         dir_light.shadows_enabled = true;
@@ -367,6 +399,44 @@ fn apply_sun_settings(
         point_light.range = transform.translation.length() * SUN_POINT_RANGE_FACTOR;
         point_light.radius = (transform.scale.x * 0.5).max(1.0);
         point_light.shadows_enabled = false;
+        *visibility = Visibility::Visible;
+    }
+}
+
+#[derive(Resource, Clone, Copy, Debug)]
+pub struct SunDirection(pub Vec3);
+
+impl Default for SunDirection {
+    fn default() -> Self {
+        Self(Vec3::new(0.32, 0.78, 0.54).normalize_or_zero())
+    }
+}
+
+impl SunDirection {
+    #[inline]
+    pub fn as_vec4(self) -> Vec4 {
+        self.0.extend(0.0)
+    }
+}
+
+fn enforce_sun_visibility(mut suns: Query<&mut Visibility, With<SunLight>>) {
+    for mut visibility in &mut suns {
+        if !matches!(*visibility, Visibility::Visible) {
+            *visibility = Visibility::Visible;
+        }
+    }
+}
+
+fn update_sun_direction_from_transform(
+    mut sun_direction: ResMut<SunDirection>,
+    lights: Query<&Transform, With<SunLight>>,
+) {
+    let Ok(transform) = lights.single() else {
+        return;
+    };
+    let dir = transform.translation.normalize_or_zero();
+    if dir.length_squared() > 0.0 && sun_direction.0.distance_squared(dir) > 1e-6 {
+        sun_direction.0 = dir;
     }
 }
 
