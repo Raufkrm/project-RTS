@@ -10,6 +10,7 @@ use crate::game::world::planet::{
 use crate::game::world::sampling::FlatSamplerRes;
 use crate::game::world::terrain::MapSettings;
 use bevy::{
+    camera::visibility::NoFrustumCulling,
     math::{primitives::Sphere, EulerRot, Quat, Vec3, Vec4},
     pbr::{wireframe::WireframePlugin, MaterialPlugin, StandardMaterial},
     prelude::*,
@@ -152,6 +153,7 @@ fn setup_world(
     existing_camera: Query<Entity, With<MainCamera>>,
     mut existing_light: Query<
         (
+            Entity,
             &mut DirectionalLight,
             &mut PointLight,
             &mut Transform,
@@ -197,7 +199,7 @@ fn setup_world(
     );
     info!("spawned planet with radius {}", params.radius);
 
-    if let Some((mut dir_light, mut point_light, mut transform, mut visibility)) =
+    if let Some((light_entity, mut dir_light, mut point_light, mut transform, mut visibility)) =
         existing_light.iter_mut().next()
     {
         dir_light.color = sun_color;
@@ -222,6 +224,9 @@ fn setup_world(
         transform.scale = sun_scale;
         transform.rotation = rotation;
         *visibility = Visibility::Visible;
+        commands
+            .entity(light_entity)
+            .insert(NoFrustumCulling);
     } else {
         let translation = sun_translation;
         let mesh = meshes.add(Sphere::new(1.0));
@@ -265,6 +270,7 @@ fn setup_world(
                 scale: sun_scale,
             },
             GlobalTransform::default(),
+            NoFrustumCulling,
             Visibility::Visible,
             InheritedVisibility::default(),
             Name::new("Sun"),

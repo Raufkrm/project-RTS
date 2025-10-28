@@ -74,7 +74,7 @@ impl Default for PlanetSurfaceParams {
                 _pad1: 0,
                 sea_level: 0.5,
                 base_freq: 0.65,
-                detail_freq: 0.1,
+                detail_freq: 1.0,
                 warp_freq: 1.6,
                 warp_amp: 0.04,
                 coast_width: 0.028,
@@ -232,7 +232,7 @@ impl Default for PlanetSettings {
     fn default() -> Self {
         Self {
             base_freq: 0.65,
-            detail_freq: 0.5,
+            detail_freq: 0.01,
             warp_freq: 1.6,
             warp_amp: 0.04,
             coast_width: 0.028,
@@ -429,6 +429,16 @@ impl<'a> ClimateModel<'a> {
         (height * 0.58 + 0.5).clamp(0.0, 1.0)
     }
 
+    fn clamp_height_to_surface(&self, sample: &ClimateFields, raw_height: f32) -> f32 {
+        if sample.land_mask > 0.5 {
+            let inland = ((sample.land_mask - 0.5) / 0.5).clamp(0.0, 1.0);
+            let uplift = inland.powf(1.35) * 0.08;
+            raw_height.max((self.sea_level + uplift).min(0.99))
+        } else {
+            self.sea_level
+        }
+    }
+
     fn evaluate(&self, unit: Vec3) -> ClimateEval {
         let warp_offset = Vec3::new(
             fbm3(self.seed ^ 0xA1, unit.x, unit.y, unit.z, self.warp_f) - 0.5,
@@ -438,12 +448,8 @@ impl<'a> ClimateModel<'a> {
         let warped = unit + warp_offset * self.warp_amp;
 
         let center_sample = self.sample_fields(warped);
-        let mut height01 = self.compose_height(&center_sample);
-        if center_sample.land_mask > 0.5 {
-            let inland = ((center_sample.land_mask - 0.5) / 0.5).clamp(0.0, 1.0);
-            let uplift = inland.powf(1.35) * 0.08;
-            height01 = height01.max((self.sea_level + uplift).min(0.99));
-        }
+        let raw_height01 = self.compose_height(&center_sample);
+        let height01 = self.clamp_height_to_surface(&center_sample, raw_height01);
 
         let eps = 0.012;
         let sample_px = self.sample_fields(warped + Vec3::new(eps, 0.0, 0.0));
@@ -453,12 +459,19 @@ impl<'a> ClimateModel<'a> {
         let sample_pz = self.sample_fields(warped + Vec3::new(0.0, 0.0, eps));
         let sample_mz = self.sample_fields(warped - Vec3::new(0.0, 0.0, eps));
 
-        let hx1 = self.compose_height(&sample_px);
-        let hx0 = self.compose_height(&sample_mx);
-        let hy1 = self.compose_height(&sample_py);
-        let hy0 = self.compose_height(&sample_my);
-        let hz1 = self.compose_height(&sample_pz);
-        let hz0 = self.compose_height(&sample_mz);
+        let hx1_raw = self.compose_height(&sample_px);
+        let hx0_raw = self.compose_height(&sample_mx);
+        let hy1_raw = self.compose_height(&sample_py);
+        let hy0_raw = self.compose_height(&sample_my);
+        let hz1_raw = self.compose_height(&sample_pz);
+        let hz0_raw = self.compose_height(&sample_mz);
+
+        let hx1 = self.clamp_height_to_surface(&sample_px, hx1_raw);
+        let hx0 = self.clamp_height_to_surface(&sample_mx, hx0_raw);
+        let hy1 = self.clamp_height_to_surface(&sample_py, hy1_raw);
+        let hy0 = self.clamp_height_to_surface(&sample_my, hy0_raw);
+        let hz1 = self.clamp_height_to_surface(&sample_pz, hz1_raw);
+        let hz0 = self.clamp_height_to_surface(&sample_mz, hz0_raw);
 
         let grad_x = (hx1 - hx0) / (2.0 * eps);
         let grad_y = (hy1 - hy0) / (2.0 * eps);
@@ -515,7 +528,8 @@ impl<'a> ClimateModel<'a> {
         temperature -= smoothstep(0.72, 0.98, lat_abs) * 0.18;
         temperature = temperature.clamp(0.0, 1.0);
 
-        let depth = ((self.sea_level - height01) / self.sea_level.max(1e-3)).clamp(0.0, 1.0);
+        let depth =
+            ((self.sea_level - raw_height01) / self.sea_level.max(1e-3)).clamp(0.0, 1.0);
         let shore_mix = (1.0 - depth).powf(0.6);
         let polar_mix = smoothstep(0.68, 0.95, lat_abs);
         let curvature_signed = height01 - avg_height;
@@ -1286,19 +1300,25 @@ fn build_colored_planet_mesh_with_subdiv(
         let packed_sl = pack_pair(eval.slope.clamp(0.0, 1.0), continent_norm);
         let micro_norm = (eval.micro_relief * 0.5 + 0.5).clamp(0.0, 1.0);
         let packed_mr = pack_pair(micro_norm, eval.ridge_light.clamp(0.0, 1.0));
-        let packed_lv = pack_pair(
-            eval.valley_shadow.clamp(0.0, 1.0),
-            eval.land_mask.clamp(0.0, 1.0),
-        );
+        let depth_or_valley = if eval.depth > 1e-4 {
+            eval.depth
+        } else {
+            eval.valley_shadow.clamp(0.0, 1.0)
+        };
+        let packed_lv = pack_pair(depth_or_valley, eval.land_mask.clamp(0.0, 1.0));
         packed_attributes.push([packed_ht, packed_sl, packed_mr, packed_lv]);
 
-        let grad = eval.gradient;
-        let mut detail_normal = Vec3::new(-grad.x, 0.6, -grad.z);
-        if detail_normal.length_squared() < 1e-6 {
-            detail_normal = unit;
-        }
-        detail_normal = detail_normal.normalize();
-        let blended_normal = (detail_normal + unit * 1.6).normalize_or_zero();
+        let blended_normal = if eval.land_mask < 0.5 {
+            unit
+        } else {
+            let grad = eval.gradient;
+            let mut detail_normal = Vec3::new(-grad.x, 0.6, -grad.z);
+            if detail_normal.length_squared() < 1e-6 {
+                detail_normal = unit;
+            }
+            detail_normal = detail_normal.normalize();
+            (detail_normal + unit * 1.6).normalize_or_zero()
+        };
         blended_normals.push(blended_normal);
     }
 
@@ -1516,4 +1536,3 @@ fn compute_smooth_normals(verts: &[Vec3], indices: &[u32]) -> Vec<[f32; 3]> {
         })
         .collect()
 }
-

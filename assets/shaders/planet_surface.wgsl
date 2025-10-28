@@ -199,7 +199,7 @@ fn to_signed(value: f32) -> f32 {
 
 fn climate_sample_fields(coord: vec3<f32>) -> ClimateFields {
     let base_f = max(material.base_freq, 1e-5);
-    let detail_f = max(material.detail_freq, 1e-5);
+    let detail_f = max(material.detail_freq, 0.35);
 
     let plate_a = to_signed(fbm3_value(
         material.seed,
@@ -241,7 +241,7 @@ fn climate_sample_fields(coord: vec3<f32>) -> ClimateFields {
         ),
         1.8,
     );
-    let detail = fbm3_value(
+    var detail = fbm3_value(
         material.seed ^ 0x63u,
         vec3(coord.x * 3.3, coord.y * 3.1, coord.z * 3.2),
         detail_f * 2.1,
@@ -251,6 +251,13 @@ fn climate_sample_fields(coord: vec3<f32>) -> ClimateFields {
         vec3(coord.x * 1.05, coord.y * 1.02, coord.z * 1.03),
         base_f * 1.3,
     );
+
+    let detail_hi = fbm3_value(
+        material.seed ^ 0x93u,
+        vec3(coord.x * 6.0, coord.y * 5.8, coord.z * 5.9),
+        max(detail_f, 0.6) * 3.5,
+    );
+    detail = mix(detail, detail_hi, 0.35);
 
     return ClimateFields(
         continent_value,
@@ -270,8 +277,8 @@ fn compose_height_from_fields(fields: ClimateFields) -> f32 {
     height = height + (fields.erosion - 0.5) * 0.22;
     height = height + pow(max(fields.mountain_seed, 1e-6), 0.9) * material.mountain_scale * 1.12;
     height = height + (fields.detail - 0.5) * 0.09;
-    height = height + pow(fields.land_mask, 3.2) * 0.08;
-    return clamp(height * 0.58 + 0.5, 0.0, 1.0);
+    height = height + pow(fields.land_mask, 2.2) * 0.08;
+    return clamp(height * 0.52 + 0.48, 0.0, 1.0);
 }
 
 fn climate_debug_evaluate(unit: vec3<f32>) -> ClimateDebugSample {
@@ -489,7 +496,7 @@ fn fragment(vertex_output: VertexOutput, @builtin(front_facing) is_front: bool) 
     let continent_value = clamp(pack_sl.y, 0.0, 1.0) * 2.0 - 1.0;
     let micro_relief = clamp(pack_mr.x, 0.0, 1.0) * 2.0 - 1.0;
     let ridge_light = clamp(pack_mr.y, 0.0, 1.0);
-    let valley_shadow = clamp(pack_lv.x, 0.0, 1.0);
+    let depth_or_valley = clamp(pack_lv.x, 0.0, 1.0);
     let land_mask = clamp(pack_lv.y, 0.0, 1.0);
     let lat_abs = abs(unit.y);
 
@@ -500,15 +507,28 @@ fn fragment(vertex_output: VertexOutput, @builtin(front_facing) is_front: bool) 
         unit.z * 8.3,
         material.detail_freq * 2.4,
     );
-    let micro = detail.value * 2.0 - 1.0;
+    var micro = detail.value * 2.0 - 1.0;
 
-    let depth = clamp((material.sea_level - height01) / max(material.sea_level, 1e-3), 0.0, 1.0);
-    let elev01 = clamp((height01 - material.sea_level) / max(1.0 - material.sea_level, 1e-3), 0.0, 1.0);
+    let is_water = height01 < material.sea_level;
+    let depth = select(
+        clamp((material.sea_level - height01) / max(material.sea_level, 1e-3), 0.0, 1.0),
+        depth_or_valley,
+        is_water,
+    );
+    let elev01 = clamp(
+        (height01 - material.sea_level) / max(1.0 - material.sea_level, 1e-3),
+        0.0,
+        1.0,
+    );
     let shore_mix = pow(max(1.0 - depth, 0.0), 0.6);
 
     var normal = normalize(pbr_input.N);
     var grad = detail.grad * (material.normal_strength * 0.9);
     grad = grad - normal * dot(normal, grad);
+    if (is_water) {
+        grad = vec3(0.0);
+        micro = 0.0;
+    }
     normal = normalize(normal + grad);
 
     var sun_dir = material.sun_dir.xyz;
@@ -527,30 +547,11 @@ fn fragment(vertex_output: VertexOutput, @builtin(front_facing) is_front: bool) 
     let rim = pow(1.0 - clamp(dot(normal, unit), 0.0, 1.0), 1.9);
 
     var albedo = vec3(0.0);
-    if height01 < material.sea_level {
-        var water = mix(material.water_deep.xyz, material.water_shallow.xyz, pow(shore_mix, 0.75));
-        let depth_strength = pow(depth, 0.65);
-        let turbidity = clamp(moisture * 0.45 + coast_band * 0.65, 0.0, 1.0);
-        water = mix(water, vec3(0.62, 0.76, 0.88), turbidity * 0.25);
-        let fresnel = pow(1.0 - abs(dot(normal, unit)), 2.2);
-        let foam = smoothstep(0.72, 1.0, shore_mix);
-        let sun_glint = pow(sun_ndotl, 14.0) * (0.15 + 0.25 * (1.0 - depth_strength));
-        water = water + vec3(foam * 0.06 + fresnel * 0.08 + sun_glint);
-        let light_factor = clamp(0.48 + hemi * 0.28 + sun_ndotl * 0.32, 0.35, 1.3);
-        water = water * light_factor + ambient_tint * (0.35 * night_mix + rim * 0.18);
-        albedo = clamp(water, vec3(0.0), vec3(1.0));
+    if (is_water) {
+        let water_color = vec3(0.12, 0.18, 0.3);
+        albedo = clamp(water_color * 0.65 + ambient_tint * 0.08, vec3(0.0), vec3(1.0));
     } else {
         var color = biome_color(temperature, moisture);
-
-        let beach_mix = clamp(
-            smoothstep(0.0, max(material.coast_width, 1e-3), elev01) * 0.65 + moisture * 0.25,
-            0.0,
-            1.0,
-        );
-        color = mix(material.land_sand.xyz, color, beach_mix);
-
-        let coast_emphasis = clamp(pow(shore_mix, 1.3) + coast_band, 0.0, 1.0);
-        color = mix(color, vec3(0.95, 0.88, 0.7), coast_emphasis * 0.35);
 
         let slope_to_rock = pow(slope, 0.8);
         let rock_span = max(material.snow_start - material.rock_start, 1e-3);
@@ -574,18 +575,21 @@ fn fragment(vertex_output: VertexOutput, @builtin(front_facing) is_front: bool) 
         let desert_bleach = pow(dryness, 1.25) * (1.0 - moisture * 0.6);
         color = mix(color, vec3(0.92, 0.82, 0.6), desert_bleach * 0.35);
 
-        let shade = clamp(
+        let coast_soft = clamp(coast_band * 0.9, 0.0, 1.0);
+
+        let shade_base = clamp(
             0.62 + hemi * 0.3 + sun_ndotl * 0.42 + ridge_light * 0.5
-                - valley_shadow * 0.35
                 + micro_relief * 0.25
                 - slope * 0.08,
             0.35,
             1.6,
         );
-        color = color * shade;
-        let spec = pow(sun_ndotl, 18.0) * pow(1.0 - slope, 1.5) * 0.18;
+        let shade = mix(1.0, shade_base, 1.0 - coast_soft);
+        color = color * shade + coast_soft * 0.05;
+        let spec = pow(sun_ndotl, 18.0) * pow(1.0 - slope, 1.5) * 0.18 * (1.0 - coast_soft);
         color = color + vec3(spec);
-        color = color + ambient_tint * (0.3 * night_mix + rim * 0.25);
+        let ambient_blend = mix(0.1, 0.3, 1.0 - coast_soft);
+        color = color + ambient_tint * (ambient_blend * night_mix + rim * 0.25 * (1.0 - coast_soft));
         color = clamp(color, vec3(0.0), vec3(1.0));
         albedo = clamp(color, vec3(0.0), vec3(1.0));
     }
