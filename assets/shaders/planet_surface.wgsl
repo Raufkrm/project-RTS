@@ -523,12 +523,8 @@ fn fragment(vertex_output: VertexOutput, @builtin(front_facing) is_front: bool) 
     let shore_mix = pow(max(1.0 - depth, 0.0), 0.6);
 
     var normal = normalize(pbr_input.N);
-    var grad = detail.grad * (material.normal_strength * 0.9);
-    grad = grad - normal * dot(normal, grad);
-    if (is_water) {
-        grad = vec3(0.0);
-        micro = 0.0;
-    }
+    var grad = vec3(0.0);
+    micro = 0.0;
     normal = normalize(normal + grad);
 
     var sun_dir = material.sun_dir.xyz;

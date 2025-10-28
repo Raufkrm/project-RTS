@@ -484,8 +484,7 @@ impl<'a> ClimateModel<'a> {
         let avg_height = (hx1 + hx0 + hy1 + hy0 + hz1 + hz0) / 6.0;
 
         let elev01 = (height01 - self.sea_level).max(0.0) / (1.0 - self.sea_level).max(1e-3);
-        let radius = self.params.radius + elev01 * self.params.height_amp;
-        let final_pos = unit * radius;
+        let final_pos = unit * self.params.radius;
 
         let lat_abs = unit.y.abs();
         let land_grad_x = (sample_px.land_mask - sample_mx.land_mask).abs();
@@ -1308,18 +1307,7 @@ fn build_colored_planet_mesh_with_subdiv(
         let packed_lv = pack_pair(depth_or_valley, eval.land_mask.clamp(0.0, 1.0));
         packed_attributes.push([packed_ht, packed_sl, packed_mr, packed_lv]);
 
-        let blended_normal = if eval.land_mask < 0.5 {
-            unit
-        } else {
-            let grad = eval.gradient;
-            let mut detail_normal = Vec3::new(-grad.x, 0.6, -grad.z);
-            if detail_normal.length_squared() < 1e-6 {
-                detail_normal = unit;
-            }
-            detail_normal = detail_normal.normalize();
-            (detail_normal + unit * 1.6).normalize_or_zero()
-        };
-        blended_normals.push(blended_normal);
+        blended_normals.push(unit);
     }
 
     let smooth_normals = compute_smooth_normals(&verts, &indices_u32);
