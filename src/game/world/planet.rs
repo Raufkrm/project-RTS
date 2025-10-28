@@ -4,6 +4,7 @@ use crate::game::world::sampling::FlatSamplerRes;
 use crate::game::world::terrain::MapSettings;
 use bevy::asset::RenderAssetUsages;
 use bevy::log::info;
+use bevy::math::primitives::Sphere;
 use bevy::pbr::{wireframe::Wireframe, MaterialExtension, StandardMaterial};
 use bevy::prelude::*;
 use bevy::reflect::TypePath;
@@ -18,6 +19,17 @@ use std::cmp::Ordering;
 // -----------------------------------------------------------------------------
 #[derive(Component)]
 pub struct PlanetTag;
+
+#[derive(Component)]
+pub struct PlanetAtmosphere;
+
+#[derive(Component)]
+pub struct PlanetClouds;
+
+const ATMOSPHERE_SCALE_FACTOR: f32 = 1.015;
+const ATMOSPHERE_ALPHA: f32 = 0.18;
+const CLOUD_SCALE_FACTOR: f32 = 1.008;
+const CLOUD_ALPHA: f32 = 0.08;
 
 #[derive(Asset, AsBindGroup, TypePath, Clone)]
 pub struct PlanetSurfaceParams {
@@ -302,6 +314,8 @@ struct ClimateEval {
     snow_score: f32,
     allow_alpine: bool,
     coast_band: f32,
+    mountain_mask: f32,
+    mountain_offset: f32,
     gradient: Vec3,
 }
 
@@ -484,7 +498,11 @@ impl<'a> ClimateModel<'a> {
         let avg_height = (hx1 + hx0 + hy1 + hy0 + hz1 + hz0) / 6.0;
 
         let elev01 = (height01 - self.sea_level).max(0.0) / (1.0 - self.sea_level).max(1e-3);
-        let final_pos = unit * self.params.radius;
+        let land_factor = center_sample.land_mask.clamp(0.0, 1.0);
+        let mountain_mask = ((center_sample.mountain_seed - 0.65).max(0.0)).powf(2.2) * land_factor;
+        let mountain_offset =
+            mountain_mask * self.params.height_amp * self.mountain_scale * 0.4;
+        let final_pos = unit * (self.params.radius + mountain_offset);
 
         let lat_abs = unit.y.abs();
         let land_grad_x = (sample_px.land_mask - sample_mx.land_mask).abs();
@@ -574,6 +592,8 @@ impl<'a> ClimateModel<'a> {
             snow_score,
             allow_alpine,
             coast_band,
+            mountain_mask,
+            mountain_offset,
             gradient: Vec3::new(grad_x, grad_y, grad_z),
         }
     }
@@ -1001,6 +1021,47 @@ fn spawn_planet_with_settings(
         ))
         .id();
 
+    let atmosphere_mesh = meshes.add(Sphere::new(1.0));
+    let atmosphere_material = standard_materials.add(StandardMaterial {
+        base_color: Color::srgba(0.18, 0.46, 0.96, ATMOSPHERE_ALPHA * 0.6),
+        emissive: Color::srgba(0.22, 0.58, 1.0, ATMOSPHERE_ALPHA * 0.9).into(),
+        alpha_mode: AlphaMode::Add,
+        unlit: true,
+        double_sided: true,
+        ..default()
+    });
+    commands.entity(planet_entity).with_children(|parent| {
+        parent.spawn((
+            PlanetAtmosphere,
+            Mesh3d(atmosphere_mesh),
+            MeshMaterial3d(atmosphere_material),
+            Transform::from_scale(Vec3::splat(params.radius * ATMOSPHERE_SCALE_FACTOR)),
+            GlobalTransform::default(),
+            Visibility::Visible,
+            InheritedVisibility::default(),
+            Name::new("PlanetAtmosphere"),
+        ));
+
+        let cloud_mesh = meshes.add(Sphere::new(1.0));
+        let cloud_material = standard_materials.add(StandardMaterial {
+            base_color: Color::srgba(1.0, 1.0, 1.0, CLOUD_ALPHA),
+            emissive: Color::srgba(0.9, 0.95, 1.0, CLOUD_ALPHA * 0.6).into(),
+            alpha_mode: AlphaMode::Blend,
+            unlit: true,
+            double_sided: true,
+            ..default()
+        });
+        parent.spawn((
+            PlanetClouds,
+            Mesh3d(cloud_mesh),
+            MeshMaterial3d(cloud_material),
+            Transform::from_scale(Vec3::splat(params.radius * CLOUD_SCALE_FACTOR)),
+            GlobalTransform::default(),
+            Visibility::Visible,
+            InheritedVisibility::default(),
+            Name::new("PlanetClouds"),
+        ));
+    });
 }
 pub fn auto_clip_planes(
     mut q_cam: Query<(&GlobalTransform, &mut Projection), With<Camera3d>>,
@@ -1307,7 +1368,21 @@ fn build_colored_planet_mesh_with_subdiv(
         let packed_lv = pack_pair(depth_or_valley, eval.land_mask.clamp(0.0, 1.0));
         packed_attributes.push([packed_ht, packed_sl, packed_mr, packed_lv]);
 
-        blended_normals.push(unit);
+        let mountain_weight = eval.mountain_mask;
+        if mountain_weight > 1e-3 {
+            let grad = eval.gradient * mountain_weight;
+            let mut detail_normal = Vec3::new(-grad.x, 0.6, -grad.z);
+            if detail_normal.length_squared() < 1e-6 {
+                detail_normal = unit;
+            } else {
+                detail_normal = detail_normal.normalize();
+            }
+            let blended = (detail_normal * mountain_weight + unit * (1.0 - mountain_weight))
+                .normalize_or_zero();
+            blended_normals.push(blended);
+        } else {
+            blended_normals.push(unit);
+        }
     }
 
     let smooth_normals = compute_smooth_normals(&verts, &indices_u32);
