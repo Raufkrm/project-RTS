@@ -229,9 +229,7 @@ fn setup_world(
         transform.scale = sun_scale;
         transform.rotation = rotation;
         *visibility = Visibility::Visible;
-        commands
-            .entity(light_entity)
-            .insert(NoFrustumCulling);
+        commands.entity(light_entity).insert(NoFrustumCulling);
     } else {
         let translation = sun_translation;
         let mesh = meshes.add(Sphere::new(1.0));

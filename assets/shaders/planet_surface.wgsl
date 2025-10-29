@@ -550,7 +550,7 @@ fn fragment(vertex_output: VertexOutput, @builtin(front_facing) is_front: bool) 
         let water_color = mix(shallow_color, deep_color, shelf_mix);
         albedo = clamp(water_color * 0.64 + ambient_tint * 0.06, vec3(0.0), vec3(1.0));
         pbr_input.material.perceptual_roughness = 0.22;
-        pbr_input.material.reflectance = 0.08;
+        pbr_input.material.reflectance = vec3(0.08);
     } else {
         var color = biome_color(temperature, moisture);
 
@@ -613,8 +613,8 @@ fn fragment(vertex_output: VertexOutput, @builtin(front_facing) is_front: bool) 
         pbr_input.material.perceptual_roughness = clamp(roughness, 0.0, 1.0);
 
         var reflectance = pbr_input.material.reflectance;
-        reflectance = reflectance + (0.06 - reflectance) * (mountain_highlight * 0.5);
-        pbr_input.material.reflectance = clamp(reflectance, 0.0, 1.0);
+        reflectance = reflectance + (vec3(0.06) - reflectance) * (mountain_highlight * 0.5);
+        pbr_input.material.reflectance = clamp(reflectance, vec3(0.0), vec3(1.0));
     }
 
     pbr_input.material.base_color = vec4(albedo, 1.0);

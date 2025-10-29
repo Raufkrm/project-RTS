@@ -1,7 +1,7 @@
 use crate::core::planet_debug::LodDebugBands;
-use crate::game::SunDirection;
 use crate::game::world::sampling::FlatSamplerRes;
 use crate::game::world::terrain::MapSettings;
+use crate::game::SunDirection;
 use bevy::asset::RenderAssetUsages;
 use bevy::log::info;
 use bevy::math::primitives::Sphere;
@@ -542,8 +542,7 @@ impl<'a> ClimateModel<'a> {
         let elev01 = (height01 - self.sea_level).max(0.0) / (1.0 - self.sea_level).max(1e-3);
         let land_factor = center_sample.land_mask.clamp(0.0, 1.0);
         let mountain_mask = ((center_sample.mountain_seed - 0.65).max(0.0)).powf(2.2) * land_factor;
-        let mountain_offset =
-            mountain_mask * self.params.height_amp * self.mountain_scale * 0.4;
+        let mountain_offset = mountain_mask * self.params.height_amp * self.mountain_scale * 0.4;
         let final_pos = unit * (self.params.radius + mountain_offset);
 
         let lat_abs = unit.y.abs();
@@ -587,8 +586,7 @@ impl<'a> ClimateModel<'a> {
         temperature -= smoothstep(0.72, 0.98, lat_abs) * 0.18;
         temperature = temperature.clamp(0.0, 1.0);
 
-        let depth =
-            ((self.sea_level - raw_height01) / self.sea_level.max(1e-3)).clamp(0.0, 1.0);
+        let depth = ((self.sea_level - raw_height01) / self.sea_level.max(1e-3)).clamp(0.0, 1.0);
         let shore_mix = (1.0 - depth).powf(0.6);
         let polar_mix = smoothstep(0.68, 0.95, lat_abs);
         let curvature_signed = height01 - avg_height;
@@ -1039,8 +1037,13 @@ fn spawn_planet_with_settings(
     }
     let handle = meshes.add(land_mesh);
 
-    let extension =
-        PlanetSurfaceParams::from_settings(sampler_res.0.seed, params, settings, sun_direction.0, debug.mode);
+    let extension = PlanetSurfaceParams::from_settings(
+        sampler_res.0.seed,
+        params,
+        settings,
+        sun_direction.0,
+        debug.mode,
+    );
     let base_material = StandardMaterial {
         base_color: Color::WHITE,
         perceptual_roughness: extension.params.perceptual_roughness,
@@ -1077,11 +1080,7 @@ fn spawn_planet_with_settings(
             double_sided: true,
             ..default()
         },
-        extension: AtmosphereParams::new(
-            LinearRgba::from(Color::srgb(0.18, 0.46, 0.94)),
-            0.6,
-            4.8,
-        ),
+        extension: AtmosphereParams::new(LinearRgba::from(Color::srgb(0.18, 0.46, 0.94)), 0.6, 4.8),
     });
     commands.entity(planet_entity).with_children(|parent| {
         parent.spawn((

@@ -48,9 +48,9 @@ const ROT_SENS: f32 = 0.0040; // rad/pixel for yaw/pitch
 const PAN_BASE: f32 = 0.0020; // per-pixel → radians, scaled by altitude/r
 const MAX_PX_STEP: f32 = 50.0; // clamp per-frame mouse delta
                                // per-notch zoom rates (tiny, multiplicative)
-const ZOOM_RATE_SURF: f32 = 0.06; // altitude scale per notch
-const ZOOM_RATE_FP: f32 = 0.06;
-const ZOOM_RATE_ORBIT: f32 = 0.08; // orbit-distance scale per notch
+const ZOOM_RATE_SURF: f32 = 0.02; // altitude scale per notch
+const ZOOM_RATE_FP: f32 = 0.03;
+const ZOOM_RATE_ORBIT: f32 = 0.01; // orbit-distance scale per notch
 
 // smoothing (critically damped)
 const TAU_ROT: f32 = 0.06;

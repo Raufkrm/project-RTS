@@ -2,6 +2,7 @@ use std::fmt::Write as _;
 
 use bevy::input::mouse::MouseButton;
 use bevy::log::{info, warn};
+use bevy::pbr::MeshMaterial3d;
 use bevy::prelude::*;
 use bevy::ui::RelativeCursorPosition;
 
@@ -47,6 +48,10 @@ impl Plugin for DevPanelPlugin {
         app.add_systems(
             Update,
             handle_seed_sweep_button.run_if(in_state(AppState::InGame)),
+        );
+        app.add_systems(
+            Update,
+            update_planet_detail_frequency.run_if(in_state(AppState::InGame)),
         );
     }
 }
@@ -1048,6 +1053,9 @@ fn apply_changes(
     if !state.dirty {
         return;
     }
+    if state.active_slider.is_some() {
+        return;
+    }
     state.dirty = false;
 
     map.seed = state.seed;
@@ -1145,6 +1153,51 @@ fn apply_changes(
         &*debug,
         &*sun_direction,
     );
+}
+
+const DETAIL_FREQ_SURFACE_NEAR: f32 = 12.0;
+const DETAIL_ALT_BLEND_START_KM: f32 = 40.0;
+const DETAIL_ALT_BLEND_END_KM: f32 = 180.0;
+
+fn update_planet_detail_frequency(
+    planet_params: Res<PlanetParams>,
+    planet_settings: Res<PlanetSettings>,
+    mut materials: ResMut<Assets<PlanetSurfaceMaterial>>,
+    q_planet: Query<(&GlobalTransform, &MeshMaterial3d<PlanetSurfaceMaterial>), With<PlanetTag>>,
+    q_camera: Query<&GlobalTransform, With<MainCamera>>,
+) {
+    let Some(camera_tf) = q_camera.iter().next() else {
+        return;
+    };
+    let Some((planet_tf, material_handle)) = q_planet.iter().next() else {
+        return;
+    };
+
+    let distance = camera_tf.translation().distance(planet_tf.translation());
+    let radius = planet_params.radius.max(1.0);
+    let altitude = (distance - radius).max(0.0);
+    let altitude_km = altitude * 0.001;
+
+    let blend = if altitude_km <= DETAIL_ALT_BLEND_START_KM {
+        1.0
+    } else if altitude_km >= DETAIL_ALT_BLEND_END_KM {
+        0.0
+    } else {
+        1.0 - ((altitude_km - DETAIL_ALT_BLEND_START_KM)
+            / (DETAIL_ALT_BLEND_END_KM - DETAIL_ALT_BLEND_START_KM))
+    };
+
+    let orbit_freq = planet_settings.detail_freq.max(0.0001);
+    let near_freq = DETAIL_FREQ_SURFACE_NEAR.max(orbit_freq);
+    let target_freq = orbit_freq + (near_freq - orbit_freq) * blend;
+
+    let handle = material_handle.0.clone();
+    if let Some(material) = materials.get_mut(&handle) {
+        let current = material.extension.params.detail_freq;
+        if (current - target_freq).abs() > 1e-3 {
+            material.extension.params.detail_freq = target_freq;
+        }
+    }
 }
 
 fn despawn_children_recursive(
