@@ -4,8 +4,9 @@ use crate::core::galaxy_camera::{GalaxyCamera, GalaxyCameraPlugin, MainCamera};
 use crate::core::planet_debug::PlanetDebugPlugin;
 use crate::core::skybox::{Skybox, SkyboxPlugin, StarfieldAssets};
 use crate::game::world::planet::{
-    spawn_random_planet_inner, sync_planet_material_uniforms, toggle_planet_wireframe,
-    update_planet_lod, PlanetDebugConfig, PlanetParams, PlanetSettings, PlanetSurfaceMaterial,
+    spawn_random_planet_inner, spin_planet_clouds, sync_planet_material_uniforms,
+    toggle_planet_wireframe, update_planet_lod, AtmosphereMaterial, PlanetDebugConfig,
+    PlanetParams, PlanetSettings, PlanetSurfaceMaterial,
 };
 use crate::game::world::sampling::FlatSamplerRes;
 use crate::game::world::terrain::MapSettings;
@@ -90,6 +91,7 @@ impl Plugin for GamePlugin {
             .init_resource::<SunSettings>()
             .init_resource::<SunDirection>()
             .add_plugins(MaterialPlugin::<PlanetSurfaceMaterial>::default())
+            .add_plugins(MaterialPlugin::<AtmosphereMaterial>::default())
             .add_plugins(WireframePlugin::default())
             .add_plugins(PlanetDebugPlugin)
             .add_plugins(GalaxyCameraPlugin)
@@ -105,6 +107,7 @@ impl Plugin for GamePlugin {
                     sync_sun_with_planet_rotation,
                     apply_sun_settings,
                     enforce_sun_visibility,
+                    spin_planet_clouds,
                 )
                     .run_if(in_state(AppState::InGame)),
             )
@@ -143,6 +146,7 @@ fn setup_world(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut planet_materials: ResMut<Assets<PlanetSurfaceMaterial>>,
+    mut atmosphere_materials: ResMut<Assets<AtmosphereMaterial>>,
     mut standard_materials: ResMut<Assets<StandardMaterial>>,
     mut sampler_res: ResMut<FlatSamplerRes>,
     map: Res<MapSettings>,
@@ -189,6 +193,7 @@ fn setup_world(
         &mut commands,
         &mut meshes,
         &mut *planet_materials,
+        &mut *atmosphere_materials,
         &mut *standard_materials,
         &*sampler_res,
         &map,

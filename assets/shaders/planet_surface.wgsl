@@ -494,7 +494,7 @@ fn fragment(vertex_output: VertexOutput, @builtin(front_facing) is_front: bool) 
     let temperature = clamp(pack_ht.y, 0.0, 1.0);
     let slope = clamp(pack_sl.x, 0.0, 1.0);
     let continent_value = clamp(pack_sl.y, 0.0, 1.0) * 2.0 - 1.0;
-    let micro_relief = clamp(pack_mr.x, 0.0, 1.0) * 2.0 - 1.0;
+    let mountain_mask = clamp(pack_mr.x, 0.0, 1.0);
     let ridge_light = clamp(pack_mr.y, 0.0, 1.0);
     let depth_or_valley = clamp(pack_lv.x, 0.0, 1.0);
     let land_mask = clamp(pack_lv.y, 0.0, 1.0);
@@ -549,6 +549,8 @@ fn fragment(vertex_output: VertexOutput, @builtin(front_facing) is_front: bool) 
         let shelf_mix = smoothstep(0.0, 0.5, depth);
         let water_color = mix(shallow_color, deep_color, shelf_mix);
         albedo = clamp(water_color * 0.64 + ambient_tint * 0.06, vec3(0.0), vec3(1.0));
+        pbr_input.material.perceptual_roughness = 0.22;
+        pbr_input.material.reflectance = 0.08;
     } else {
         var color = biome_color(temperature, moisture);
 
@@ -578,28 +580,41 @@ fn fragment(vertex_output: VertexOutput, @builtin(front_facing) is_front: bool) 
         let sand_mix = clamp(smoothstep(0.0, 0.25, elev01), 0.0, 1.0);
         let coast_color = mix(material.land_sand.xyz, color, sand_mix);
         color = mix(coast_color, color, clamp(coast_soft * 0.55, 0.0, 1.0));
-        color = clamp(color + vec3(micro) * 0.03, vec3(0.0), vec3(1.0));
+        color = clamp(color + vec3(micro) * 0.025, vec3(0.0), vec3(1.0));
 
         let cloud_seed = smoothstep(0.65, 1.0, snow_score) * 0.6
             + smoothstep(0.58, 0.92, moisture) * (1.0 - dryness) * 0.4;
         let cloud_intensity = clamp(cloud_seed, 0.0, 1.0);
         color = clamp(color + vec3(cloud_intensity) * 0.07, vec3(0.0), vec3(1.0));
 
+        let mountain_highlight = pow(mountain_mask, 1.4);
+        color = mix(color, color + vec3(0.18), mountain_highlight * 0.35);
+
         let shade_base = clamp(
             0.62 + hemi * 0.3 + sun_ndotl * 0.42 + ridge_light * 0.5
-                + micro_relief * 0.25
+                + micro * 0.18
                 - slope * 0.08,
             0.35,
             1.6,
         );
         let shade = mix(1.0, shade_base, 1.0 - coast_soft);
-        color = color * shade + coast_soft * 0.03;
-        let spec = pow(sun_ndotl, 18.0) * pow(1.0 - slope, 1.5) * 0.16 * (1.0 - coast_soft);
+        let mountain_shade = mix(shade, max(shade, 1.05), mountain_highlight * 0.5);
+        color = color * mountain_shade + coast_soft * 0.03;
+        let spec =
+            pow(sun_ndotl, 18.0) * pow(1.0 - slope, 1.5) * 0.16 * (1.0 - coast_soft) * (1.0 + mountain_highlight * 0.5);
         color = color + vec3(spec);
         let ambient_blend = mix(0.12, 0.26, 1.0 - coast_soft);
-        color = color + ambient_tint * (ambient_blend * night_mix + rim * 0.25 * (1.0 - coast_soft));
+        color =
+            color + ambient_tint * (ambient_blend * night_mix + rim * 0.25 * (1.0 - coast_soft));
         color = clamp(color, vec3(0.0), vec3(1.0));
         albedo = clamp(color, vec3(0.0), vec3(1.0));
+        var roughness = pbr_input.material.perceptual_roughness;
+        roughness = roughness + (0.38 - roughness) * (mountain_highlight * 0.6);
+        pbr_input.material.perceptual_roughness = clamp(roughness, 0.0, 1.0);
+
+        var reflectance = pbr_input.material.reflectance;
+        reflectance = reflectance + (0.06 - reflectance) * (mountain_highlight * 0.5);
+        pbr_input.material.reflectance = clamp(reflectance, 0.0, 1.0);
     }
 
     pbr_input.material.base_color = vec4(albedo, 1.0);

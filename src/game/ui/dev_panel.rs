@@ -10,8 +10,8 @@ use crate::core::galaxy_camera::MainCamera;
 use crate::game::world::planet::{
     analyze_planet_climate, apply_guardrail_adjustment, guardrail_adjustment_from_summaries,
     guardrail_adjustment_from_summary, log_planet_configuration, spawn_random_planet_inner,
-    GuardrailAdjustment, PlanetClimateSummary, PlanetDebugConfig, PlanetParams, PlanetSettings,
-    PlanetSurfaceMaterial, PlanetTag,
+    AtmosphereMaterial, GuardrailAdjustment, PlanetClimateSummary, PlanetDebugConfig, PlanetParams,
+    PlanetSettings, PlanetSurfaceMaterial, PlanetTag,
 };
 use crate::game::world::sampling::FlatSamplerRes;
 use crate::game::world::terrain::{MapRoot, MapSettings};
@@ -1039,6 +1039,7 @@ fn apply_changes(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut planet_materials: ResMut<Assets<PlanetSurfaceMaterial>>,
+    mut atmosphere_materials: ResMut<Assets<AtmosphereMaterial>>,
     mut standard_materials: ResMut<Assets<StandardMaterial>>,
     planets: Query<Entity, With<PlanetTag>>,
     roots: Query<Entity, With<MapRoot>>,
@@ -1135,6 +1136,7 @@ fn apply_changes(
         &mut commands,
         &mut meshes,
         &mut *planet_materials,
+        &mut *atmosphere_materials,
         &mut *standard_materials,
         &*sampler,
         &*map,

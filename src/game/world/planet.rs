@@ -30,6 +30,7 @@ const ATMOSPHERE_SCALE_FACTOR: f32 = 1.015;
 const ATMOSPHERE_ALPHA: f32 = 0.18;
 const CLOUD_SCALE_FACTOR: f32 = 1.008;
 const CLOUD_ALPHA: f32 = 0.08;
+const CLOUD_ROTATION_SPEED: f32 = 0.012;
 
 #[derive(Asset, AsBindGroup, TypePath, Clone)]
 pub struct PlanetSurfaceParams {
@@ -74,6 +75,47 @@ pub struct PlanetSurfaceUniform {
 
 pub type PlanetSurfaceMaterial =
     bevy::pbr::ExtendedMaterial<bevy::pbr::StandardMaterial, PlanetSurfaceParams>;
+
+#[repr(C)]
+#[derive(Clone, Copy, ShaderType)]
+pub struct AtmosphereUniform {
+    pub color: Vec4,
+    pub intensity: f32,
+    pub falloff: f32,
+    pub _pad: f32,
+}
+
+#[derive(Asset, AsBindGroup, TypePath, Clone)]
+pub struct AtmosphereParams {
+    #[uniform(31)]
+    pub params: AtmosphereUniform,
+}
+
+pub type AtmosphereMaterial =
+    bevy::pbr::ExtendedMaterial<bevy::pbr::StandardMaterial, AtmosphereParams>;
+
+impl AtmosphereParams {
+    pub fn new(color: LinearRgba, intensity: f32, falloff: f32) -> Self {
+        Self {
+            params: AtmosphereUniform {
+                color: color.to_vec4(),
+                intensity,
+                falloff,
+                _pad: 0.0,
+            },
+        }
+    }
+}
+
+impl MaterialExtension for AtmosphereParams {
+    fn vertex_shader() -> ShaderRef {
+        ShaderRef::Path("shaders/planet_atmosphere.wgsl".into())
+    }
+
+    fn fragment_shader() -> ShaderRef {
+        ShaderRef::Path("shaders/planet_atmosphere.wgsl".into())
+    }
+}
 
 impl Default for PlanetSurfaceParams {
     fn default() -> Self {
@@ -244,7 +286,7 @@ impl Default for PlanetSettings {
     fn default() -> Self {
         Self {
             base_freq: 0.65,
-            detail_freq: 0.01,
+            detail_freq: 1.0,
             warp_freq: 1.6,
             warp_amp: 0.04,
             coast_width: 0.028,
@@ -894,6 +936,7 @@ pub fn spawn_random_planet_inner(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
     planet_materials: &mut Assets<PlanetSurfaceMaterial>,
+    atmosphere_materials: &mut Assets<AtmosphereMaterial>,
     standard_materials: &mut Assets<StandardMaterial>,
     sampler_res: &FlatSamplerRes,
     map: &MapSettings,
@@ -914,6 +957,7 @@ pub fn spawn_random_planet_inner(
         commands,
         meshes,
         planet_materials,
+        atmosphere_materials,
         standard_materials,
         sampler_res,
         map,
@@ -930,6 +974,7 @@ pub fn spawn_random_planet_with_settings_system(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut planet_materials: ResMut<Assets<PlanetSurfaceMaterial>>,
+    mut atmosphere_materials: ResMut<Assets<AtmosphereMaterial>>,
     mut standard_materials: ResMut<Assets<StandardMaterial>>,
     sampler_res: Res<FlatSamplerRes>,
     map: Res<MapSettings>,
@@ -950,6 +995,7 @@ pub fn spawn_random_planet_with_settings_system(
         &mut commands,
         &mut meshes,
         &mut *planet_materials,
+        &mut *atmosphere_materials,
         &mut *standard_materials,
         &sampler_res,
         &map,
@@ -964,6 +1010,7 @@ fn spawn_planet_with_settings(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
     planet_materials: &mut Assets<PlanetSurfaceMaterial>,
+    atmosphere_materials: &mut Assets<AtmosphereMaterial>,
     standard_materials: &mut Assets<StandardMaterial>,
     sampler_res: &FlatSamplerRes,
     _map: &MapSettings,
@@ -1022,13 +1069,19 @@ fn spawn_planet_with_settings(
         .id();
 
     let atmosphere_mesh = meshes.add(Sphere::new(1.0));
-    let atmosphere_material = standard_materials.add(StandardMaterial {
-        base_color: Color::srgba(0.18, 0.46, 0.96, ATMOSPHERE_ALPHA * 0.6),
-        emissive: Color::srgba(0.22, 0.58, 1.0, ATMOSPHERE_ALPHA * 0.9).into(),
-        alpha_mode: AlphaMode::Add,
-        unlit: true,
-        double_sided: true,
-        ..default()
+    let atmosphere_material = atmosphere_materials.add(AtmosphereMaterial {
+        base: StandardMaterial {
+            base_color: Color::srgba(0.0, 0.0, 0.0, 0.0),
+            alpha_mode: AlphaMode::Add,
+            unlit: true,
+            double_sided: true,
+            ..default()
+        },
+        extension: AtmosphereParams::new(
+            LinearRgba::from(Color::srgb(0.18, 0.46, 0.94)),
+            0.6,
+            4.8,
+        ),
     });
     commands.entity(planet_entity).with_children(|parent| {
         parent.spawn((
@@ -1113,6 +1166,16 @@ pub fn log_planet_configuration(
         settings.mountain_spikiness,
         params.rotation_deg
     );
+}
+
+pub fn spin_planet_clouds(time: Res<Time>, mut clouds: Query<&mut Transform, With<PlanetClouds>>) {
+    let delta = time.delta_secs() * CLOUD_ROTATION_SPEED;
+    if delta.abs() < f32::EPSILON {
+        return;
+    }
+    for mut transform in &mut clouds {
+        transform.rotate_y(delta);
+    }
 }
 
 pub fn toggle_planet_wireframe(
@@ -1358,8 +1421,10 @@ fn build_colored_planet_mesh_with_subdiv(
         let packed_ht = pack_pair(eval.height01, eval.temperature);
         let continent_norm = ((eval.continent_value + 1.0) * 0.5).clamp(0.0, 1.0);
         let packed_sl = pack_pair(eval.slope.clamp(0.0, 1.0), continent_norm);
-        let micro_norm = (eval.micro_relief * 0.5 + 0.5).clamp(0.0, 1.0);
-        let packed_mr = pack_pair(micro_norm, eval.ridge_light.clamp(0.0, 1.0));
+        let packed_mr = pack_pair(
+            eval.mountain_mask.clamp(0.0, 1.0),
+            eval.ridge_light.clamp(0.0, 1.0),
+        );
         let depth_or_valley = if eval.depth > 1e-4 {
             eval.depth
         } else {
