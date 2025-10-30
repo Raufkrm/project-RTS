@@ -3,10 +3,16 @@ use crate::app::AppState;
 use crate::core::galaxy_camera::{GalaxyCamera, GalaxyCameraPlugin, MainCamera};
 use crate::core::planet_debug::PlanetDebugPlugin;
 use crate::core::skybox::{Skybox, SkyboxPlugin, StarfieldAssets};
+use crate::game::planet_surface::{
+    manager::{update_planet_context, PlanetContext},
+    procedural_loader::process_patch_queue,
+    render::{update_patch_stats, PatchRegistry, PatchStats},
+    stream::{drain_requests_system, PatchRequestQueue},
+};
 use crate::game::world::planet::{
     spawn_random_planet_inner, spin_planet_clouds, sync_planet_material_uniforms,
     toggle_planet_wireframe, update_planet_lod, AtmosphereMaterial, PlanetDebugConfig,
-    PlanetParams, PlanetSettings, PlanetSurfaceMaterial,
+    PlanetEntity, PlanetParams, PlanetSettings, PlanetSurfaceMaterial,
 };
 use crate::game::world::sampling::FlatSamplerRes;
 use crate::game::world::terrain::MapSettings;
@@ -20,6 +26,7 @@ use bevy::{
     },
 };
 
+pub mod planet_surface;
 pub mod ui;
 pub mod world;
 
@@ -90,6 +97,11 @@ impl Plugin for GamePlugin {
             .init_resource::<PlanetDebugConfig>()
             .init_resource::<SunSettings>()
             .init_resource::<SunDirection>()
+            .init_resource::<PlanetEntity>()
+            .init_resource::<PlanetContext>()
+            .init_resource::<PatchRequestQueue>()
+            .init_resource::<PatchRegistry>()
+            .init_resource::<PatchStats>()
             .add_plugins(MaterialPlugin::<PlanetSurfaceMaterial>::default())
             .add_plugins(MaterialPlugin::<AtmosphereMaterial>::default())
             .add_plugins(WireframePlugin::default())
@@ -102,12 +114,16 @@ impl Plugin for GamePlugin {
                 (
                     update_sun_direction_from_transform,
                     update_planet_lod,
+                    update_planet_context,
+                    drain_requests_system,
+                    process_patch_queue,
                     sync_planet_material_uniforms,
                     toggle_planet_wireframe,
                     sync_sun_with_planet_rotation,
                     apply_sun_settings,
                     enforce_sun_visibility,
                     spin_planet_clouds,
+                    update_patch_stats,
                 )
                     .run_if(in_state(AppState::InGame)),
             )

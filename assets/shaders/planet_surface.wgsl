@@ -500,14 +500,78 @@ fn fragment(vertex_output: VertexOutput, @builtin(front_facing) is_front: bool) 
     let land_mask = clamp(pack_lv.y, 0.0, 1.0);
     let lat_abs = abs(unit.y);
 
-    let detail = fbm3_with_derivative(
-        material.seed ^ 0xE1u,
-        unit.x * 8.4,
-        unit.y * 8.1,
-        unit.z * 8.3,
-        material.detail_freq * 2.4,
+    let warp_field = fbm3_with_derivative(
+        material.seed ^ 0xABu,
+        unit.x * 4.1,
+        unit.y * 4.4,
+        unit.z * 4.3,
+        material.detail_freq * 1.8,
     );
-    var micro = detail.value * 2.0 - 1.0;
+    let warped_unit = normalize(unit + warp_field.grad * (0.06 * material.detail_freq));
+
+    let basis0 = warped_unit;
+    let basis1 = vec3(warped_unit.y, warped_unit.z, warped_unit.x);
+    let basis2 = vec3(warped_unit.z, warped_unit.x, warped_unit.y);
+
+    let coarse0 =
+        fbm3_with_derivative(
+            material.seed ^ 0xE1u,
+            basis0.x * 8.4,
+            basis0.y * 8.1,
+            basis0.z * 8.3,
+            material.detail_freq * 2.4,
+        )
+            .value;
+    let coarse1 =
+        fbm3_with_derivative(
+            material.seed ^ 0x9Du,
+            basis1.x * 8.4,
+            basis1.y * 8.1,
+            basis1.z * 8.3,
+            material.detail_freq * 2.4,
+        )
+            .value;
+    let coarse2 =
+        fbm3_with_derivative(
+            material.seed ^ 0xA7u,
+            basis2.x * 8.4,
+            basis2.y * 8.1,
+            basis2.z * 8.3,
+            material.detail_freq * 2.4,
+        )
+            .value;
+    let coarse_noise = ((coarse0 + coarse1 + coarse2) / 3.0) * 2.0 - 1.0;
+
+    let fine0 =
+        fbm3_with_derivative(
+            material.seed ^ 0xC5u,
+            basis0.y * 13.6,
+            basis0.z * 13.2,
+            basis0.x * 13.4,
+            material.detail_freq * 5.8,
+        )
+            .value;
+    let fine1 =
+        fbm3_with_derivative(
+            material.seed ^ 0xB1u,
+            basis1.y * 13.6,
+            basis1.z * 13.2,
+            basis1.x * 13.4,
+            material.detail_freq * 5.8,
+        )
+            .value;
+    let fine2 =
+        fbm3_with_derivative(
+            material.seed ^ 0xD3u,
+            basis2.y * 13.6,
+            basis2.z * 13.2,
+            basis2.x * 13.4,
+            material.detail_freq * 5.8,
+        )
+            .value;
+    let fine_noise = ((fine0 + fine1 + fine2) / 3.0) * 2.0 - 1.0;
+
+    var micro = coarse_noise * 0.5 + fine_noise * 0.5;
 
     let is_water = height01 < material.sea_level;
     let depth = select(
@@ -580,7 +644,7 @@ fn fragment(vertex_output: VertexOutput, @builtin(front_facing) is_front: bool) 
         let sand_mix = clamp(smoothstep(0.0, 0.25, elev01), 0.0, 1.0);
         let coast_color = mix(material.land_sand.xyz, color, sand_mix);
         color = mix(coast_color, color, clamp(coast_soft * 0.55, 0.0, 1.0));
-        color = clamp(color + vec3(micro) * 0.025, vec3(0.0), vec3(1.0));
+        color = clamp(color + vec3(micro) * 0.032, vec3(0.0), vec3(1.0));
 
         let cloud_seed = smoothstep(0.65, 1.0, snow_score) * 0.6
             + smoothstep(0.58, 0.92, moisture) * (1.0 - dryness) * 0.4;
@@ -592,7 +656,7 @@ fn fragment(vertex_output: VertexOutput, @builtin(front_facing) is_front: bool) 
 
         let shade_base = clamp(
             0.62 + hemi * 0.3 + sun_ndotl * 0.42 + ridge_light * 0.5
-                + micro * 0.18
+                + micro * 0.22
                 - slope * 0.08,
             0.35,
             1.6,

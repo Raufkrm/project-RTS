@@ -17,6 +17,7 @@ const ORBIT_ROT_SPEED: f32 = 0.004;
 const ORBIT_LAT_LIMIT: f32 = std::f32::consts::FRAC_PI_2 - 0.02;
 /// Extra altitude (in planet radii) we require before auto-dropping back to free mode.
 const ORBIT_EXIT_EXTRA_FACTOR: f32 = 1.2;
+const ORBIT_ZOOM_RATE: f32 = 0.02;
 
 #[derive(Component)]
 pub struct MainCamera;
@@ -237,7 +238,8 @@ fn camera_controller_system(
             }
 
             if wheel_sum.abs() > f32::EPSILON {
-                orbit.altitude = (orbit.altitude - wheel_sum * (orbit.radius * 0.25))
+                let factor = (1.0 - wheel_sum * ORBIT_ZOOM_RATE).clamp(0.4, 1.6);
+                orbit.altitude = (orbit.altitude * factor)
                     .clamp(ORBIT_MIN_ALT, orbit.radius * ORBIT_MAX_ALT_FACTOR);
 
                 // Require extra headroom before dropping back to the free camera to avoid rapid re-snaps.

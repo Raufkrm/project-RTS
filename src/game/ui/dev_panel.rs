@@ -8,6 +8,8 @@ use bevy::ui::RelativeCursorPosition;
 
 use crate::app::AppState;
 use crate::core::galaxy_camera::MainCamera;
+use crate::game::planet_surface::manager::{PlanetContext, PlanetContextLayer};
+use crate::game::planet_surface::render::PatchStats;
 use crate::game::world::planet::{
     analyze_planet_climate, apply_guardrail_adjustment, guardrail_adjustment_from_summaries,
     guardrail_adjustment_from_summary, log_planet_configuration, spawn_random_planet_inner,
@@ -74,6 +76,9 @@ struct DevPanelState {
     sun_brightness: f32,
     camera_altitude: f32,
     zoom_ratio: f32,
+    context_layer: PlanetContextLayer,
+    patches_loaded: usize,
+    patches_requested: usize,
 
     dirty: bool,
     active_slider: Option<ParameterKind>,
@@ -98,6 +103,9 @@ impl Default for DevPanelState {
             sun_brightness: 0.10,
             camera_altitude: 0.0,
             zoom_ratio: 1.0,
+            context_layer: PlanetContextLayer::Orbit,
+            patches_loaded: 0,
+            patches_requested: 0,
             dirty: false,
             active_slider: None,
             active_input: None,
@@ -309,6 +317,8 @@ struct DevPanelRoot;
 
 #[derive(Component)]
 struct FpsText;
+#[derive(Component)]
+struct ContextText;
 
 #[derive(Component)]
 struct SeedInput;
@@ -385,6 +395,9 @@ fn spawn_dev_panel(
     state.sun_brightness = sun_settings.brightness;
     state.camera_altitude = 0.0;
     state.zoom_ratio = 1.0;
+    state.context_layer = PlanetContextLayer::Orbit;
+    state.patches_loaded = 0;
+    state.patches_requested = 0;
 
     let font = asset_server.load("fonts/arial.ttf");
 
@@ -425,6 +438,17 @@ fn spawn_dev_panel(
                 },
                 TextColor(Color::srgba(0.9, 0.9, 0.9, 1.0)),
                 FpsText,
+            ));
+
+            panel.spawn((
+                Text::new("Context: Orbit | Surface patches: 0 / 0"),
+                TextFont {
+                    font: font.clone(),
+                    font_size: 15.0,
+                    ..default()
+                },
+                TextColor(Color::srgba(0.75, 0.86, 1.0, 1.0)),
+                ContextText,
             ));
 
             panel
@@ -666,11 +690,22 @@ fn toggle_panel_visibility(
 fn update_fps_display(
     time: Res<Time>,
     params: Res<PlanetParams>,
+    context: Res<PlanetContext>,
+    stats: Res<PatchStats>,
     mut state: ResMut<DevPanelState>,
-    mut fps_text: Query<&mut Text, With<FpsText>>,
-    q_cam: Query<&GlobalTransform, With<MainCamera>>,
-    q_planet: Query<&GlobalTransform, With<PlanetTag>>,
+    mut texts: ParamSet<(
+        Query<&mut Text, With<FpsText>>,
+        Query<&mut Text, With<ContextText>>,
+    )>,
+    mut transforms: ParamSet<(
+        Query<&GlobalTransform, With<MainCamera>>,
+        Query<&GlobalTransform, With<PlanetTag>>,
+    )>,
 ) {
+    state.context_layer = context.layer;
+    state.patches_loaded = stats.loaded;
+    state.patches_requested = stats.requested;
+
     let dt = time.delta_secs();
     if dt > 0.0 {
         let fps = (1.0 / dt).clamp(0.0, 9999.0);
@@ -682,7 +717,9 @@ fn update_fps_display(
         };
     }
 
-    if let (Some(cam_tf), Some(planet_tf)) = (q_cam.iter().next(), q_planet.iter().next()) {
+    let cam_tf = transforms.p0().iter().next().copied();
+    let planet_tf = transforms.p1().iter().next().copied();
+    if let (Some(cam_tf), Some(planet_tf)) = (cam_tf, planet_tf) {
         let center = planet_tf.translation();
         let dist = cam_tf.translation().distance(center);
         let radius = params.radius.max(1.0);
@@ -691,11 +728,23 @@ fn update_fps_display(
         state.zoom_ratio = (dist / radius).max(1.0);
     }
 
-    if let Ok(mut text) = fps_text.single_mut() {
+    if let Ok(mut text) = texts.p0().single_mut() {
         let alt_km = state.camera_altitude / 1000.0;
         text.0 = format!(
             "FPS: {:.1} | Alt: {:.1} km | Zoom: {:.2}x",
             state.fps_smooth, alt_km, state.zoom_ratio
+        );
+    }
+
+    if let Some(mut text) = texts.p1().iter_mut().next() {
+        let layer_label = match state.context_layer {
+            PlanetContextLayer::Orbit => "Orbit",
+            PlanetContextLayer::Approach => "Approach",
+            PlanetContextLayer::Surface => "Surface",
+        };
+        text.0 = format!(
+            "Context: {} | Surface patches: {} / {}",
+            layer_label, state.patches_loaded, state.patches_requested
         );
     }
 }

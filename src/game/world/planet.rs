@@ -26,6 +26,9 @@ pub struct PlanetAtmosphere;
 #[derive(Component)]
 pub struct PlanetClouds;
 
+#[derive(Resource, Default, Clone, Copy)]
+pub struct PlanetEntity(pub Option<Entity>);
+
 const ATMOSPHERE_SCALE_FACTOR: f32 = 1.015;
 const ATMOSPHERE_ALPHA: f32 = 0.18;
 const CLOUD_SCALE_FACTOR: f32 = 1.008;
@@ -1070,6 +1073,7 @@ fn spawn_planet_with_settings(
             Name::new("Planet"),
         ))
         .id();
+    commands.insert_resource(PlanetEntity(Some(planet_entity)));
 
     let atmosphere_mesh = meshes.add(Sphere::new(1.0));
     let atmosphere_material = atmosphere_materials.add(AtmosphereMaterial {
