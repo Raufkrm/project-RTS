@@ -4,8 +4,8 @@ use crate::core::galaxy_camera::{GalaxyCamera, GalaxyCameraPlugin, MainCamera};
 use crate::core::planet_debug::PlanetDebugPlugin;
 use crate::core::skybox::{Skybox, SkyboxPlugin, StarfieldAssets};
 use crate::game::planet_surface::{
-    manager::{update_planet_context, PlanetContext},
-    procedural_loader::process_patch_queue,
+    manager::{update_planet_context, PlanetContext, PlanetLodConfig},
+    procedural_loader::{process_patch_queue, prune_surface_patches},
     render::{update_patch_stats, PatchRegistry, PatchStats},
     stream::{drain_requests_system, PatchRequestQueue},
 };
@@ -99,6 +99,7 @@ impl Plugin for GamePlugin {
             .init_resource::<SunDirection>()
             .init_resource::<PlanetEntity>()
             .init_resource::<PlanetContext>()
+            .init_resource::<PlanetLodConfig>()
             .init_resource::<PatchRequestQueue>()
             .init_resource::<PatchRegistry>()
             .init_resource::<PatchStats>()
@@ -117,6 +118,7 @@ impl Plugin for GamePlugin {
                     update_planet_context,
                     drain_requests_system,
                     process_patch_queue,
+                    prune_surface_patches,
                     sync_planet_material_uniforms,
                     toggle_planet_wireframe,
                     sync_sun_with_planet_rotation,

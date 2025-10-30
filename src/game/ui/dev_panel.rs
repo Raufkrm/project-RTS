@@ -8,7 +8,10 @@ use bevy::ui::RelativeCursorPosition;
 
 use crate::app::AppState;
 use crate::core::galaxy_camera::MainCamera;
-use crate::game::planet_surface::manager::{PlanetContext, PlanetContextLayer};
+use crate::game::planet_surface::manager::{
+    PlanetContext, PlanetContextLayer, PlanetLodConfig, DEFAULT_APPROACH_ERROR_THRESHOLD,
+    DEFAULT_SURFACE_ERROR_THRESHOLD,
+};
 use crate::game::planet_surface::render::PatchStats;
 use crate::game::world::planet::{
     analyze_planet_climate, apply_guardrail_adjustment, guardrail_adjustment_from_summaries,
@@ -53,7 +56,11 @@ impl Plugin for DevPanelPlugin {
         );
         app.add_systems(
             Update,
-            update_planet_detail_frequency.run_if(in_state(AppState::InGame)),
+            (
+                update_planet_detail_frequency,
+                sync_lod_settings_from_panel,
+            )
+                .run_if(in_state(AppState::InGame)),
         );
     }
 }
@@ -79,6 +86,8 @@ struct DevPanelState {
     context_layer: PlanetContextLayer,
     patches_loaded: usize,
     patches_requested: usize,
+    lod_surface_error: f32,
+    lod_approach_error: f32,
 
     dirty: bool,
     active_slider: Option<ParameterKind>,
@@ -106,6 +115,8 @@ impl Default for DevPanelState {
             context_layer: PlanetContextLayer::Orbit,
             patches_loaded: 0,
             patches_requested: 0,
+            lod_surface_error: DEFAULT_SURFACE_ERROR_THRESHOLD,
+            lod_approach_error: DEFAULT_APPROACH_ERROR_THRESHOLD,
             dirty: false,
             active_slider: None,
             active_input: None,
@@ -137,6 +148,8 @@ enum ParameterKind {
     Mountains,
     Rotation,
     SunBrightness,
+    LodSurfaceError,
+    LodApproachError,
 }
 
 #[derive(Clone, Copy)]
@@ -190,7 +203,7 @@ impl ParameterDescriptor {
     }
 }
 
-const PARAM_DESCRIPTORS: [ParameterDescriptor; 10] = [
+const PARAM_DESCRIPTORS: [ParameterDescriptor; 12] = [
     ParameterDescriptor {
         kind: ParameterKind::WaterLevel,
         label: "Water Level",
@@ -270,6 +283,22 @@ const PARAM_DESCRIPTORS: [ParameterDescriptor; 10] = [
         max: 5.0,
         log_scale: true,
         precision: 2,
+    },
+    ParameterDescriptor {
+        kind: ParameterKind::LodSurfaceError,
+        label: "LOD Surface Err",
+        min: 0.005,
+        max: 0.08,
+        log_scale: false,
+        precision: 3,
+    },
+    ParameterDescriptor {
+        kind: ParameterKind::LodApproachError,
+        label: "LOD Approach Err",
+        min: 0.04,
+        max: 0.5,
+        log_scale: false,
+        precision: 3,
     },
 ];
 
@@ -375,6 +404,7 @@ fn spawn_dev_panel(
     params: Res<PlanetParams>,
     settings: Res<PlanetSettings>,
     sun_settings: Res<SunSettings>,
+    lod: Res<PlanetLodConfig>,
 ) {
     state.open = true;
     state.active_input = None;
@@ -398,6 +428,8 @@ fn spawn_dev_panel(
     state.context_layer = PlanetContextLayer::Orbit;
     state.patches_loaded = 0;
     state.patches_requested = 0;
+    state.lod_surface_error = lod.surface_error;
+    state.lod_approach_error = lod.approach_error;
 
     let font = asset_server.load("fonts/arial.ttf");
 
@@ -1249,6 +1281,43 @@ fn update_planet_detail_frequency(
     }
 }
 
+fn sync_lod_settings_from_panel(
+    mut state: ResMut<DevPanelState>,
+    mut lod: ResMut<PlanetLodConfig>,
+) {
+    let surface_desc = descriptor_for(ParameterKind::LodSurfaceError);
+    let approach_desc = descriptor_for(ParameterKind::LodApproachError);
+
+    let surface = surface_desc.clamp(state.lod_surface_error);
+    let mut approach = approach_desc.clamp(state.lod_approach_error);
+
+    if approach < surface {
+        approach = surface;
+    }
+
+    if (surface - state.lod_surface_error).abs() > 1e-6 {
+        state.lod_surface_error = surface;
+    }
+    if (approach - state.lod_approach_error).abs() > 1e-6 {
+        state.lod_approach_error = approach;
+    }
+
+    let mut changed = false;
+    if (lod.surface_error - surface).abs() > 1e-5 {
+        lod.surface_error = surface;
+        changed = true;
+    }
+    if (lod.approach_error - approach).abs() > 1e-5 {
+        lod.approach_error = approach;
+        changed = true;
+    }
+
+    if changed {
+        // No additional action required; planet context will pick up the new
+        // thresholds on the next update tick.
+    }
+}
+
 fn despawn_children_recursive(
     commands: &mut Commands,
     entity: Entity,
@@ -1271,12 +1340,14 @@ impl DevPanelState {
             ParameterKind::BaseFreq => self.base_freq,
             ParameterKind::DetailFreq => self.detail_freq,
             ParameterKind::WarpFreq => self.warp_freq,
-            ParameterKind::WarpAmp => self.warp_amp,
-            ParameterKind::Mountains => self.mountain_strength,
-            ParameterKind::Rotation => self.rotation_deg,
-            ParameterKind::SunBrightness => self.sun_brightness,
-        }
+        ParameterKind::WarpAmp => self.warp_amp,
+        ParameterKind::Mountains => self.mountain_strength,
+        ParameterKind::Rotation => self.rotation_deg,
+        ParameterKind::SunBrightness => self.sun_brightness,
+        ParameterKind::LodSurfaceError => self.lod_surface_error,
+        ParameterKind::LodApproachError => self.lod_approach_error,
     }
+}
 
     fn set_parameter(&mut self, kind: ParameterKind, value: f32) {
         let descriptor = descriptor_for(kind);
@@ -1292,11 +1363,15 @@ impl DevPanelState {
             ParameterKind::Mountains => &mut self.mountain_strength,
             ParameterKind::Rotation => &mut self.rotation_deg,
             ParameterKind::SunBrightness => &mut self.sun_brightness,
+            ParameterKind::LodSurfaceError => &mut self.lod_surface_error,
+            ParameterKind::LodApproachError => &mut self.lod_approach_error,
         };
 
         if (clamped - *target).abs() > f32::EPSILON {
             *target = clamped;
-            self.dirty = true;
+            if !matches!(kind, ParameterKind::LodSurfaceError | ParameterKind::LodApproachError) {
+                self.dirty = true;
+            }
         }
     }
 }
