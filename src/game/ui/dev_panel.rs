@@ -22,12 +22,22 @@ use crate::game::world::planet::{
 use crate::game::world::sampling::FlatSamplerRes;
 use crate::game::world::terrain::{MapRoot, MapSettings};
 use crate::game::{SunDirection, SunSettings};
+use crate::game::ui::pause_menu::pause_menu_hidden;
+use crate::game::ui::settings_menu::settings_menu_hidden;
 
 pub struct DevPanelPlugin;
 
+#[derive(Message)]
+pub enum DevPanelCommand {
+    Show,
+    Hide,
+    Toggle,
+}
+
 impl Plugin for DevPanelPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<DevPanelState>()
+        app.add_message::<DevPanelCommand>()
+            .init_resource::<DevPanelState>()
             .init_resource::<PlanetSettings>()
             .add_systems(
                 OnEnter(AppState::InGame),
@@ -38,6 +48,7 @@ impl Plugin for DevPanelPlugin {
                 Update,
                 (
                     toggle_panel_visibility,
+                    handle_panel_commands,
                     update_fps_display,
                     handle_reroll_button,
                     slider_input_system,
@@ -48,11 +59,16 @@ impl Plugin for DevPanelPlugin {
                     update_input_highlights,
                     apply_changes,
                 )
-                    .run_if(in_state(AppState::InGame)),
+                    .run_if(in_state(AppState::InGame))
+                    .run_if(pause_menu_hidden)
+                    .run_if(settings_menu_hidden),
             );
         app.add_systems(
             Update,
-            handle_seed_sweep_button.run_if(in_state(AppState::InGame)),
+            handle_seed_sweep_button
+                .run_if(in_state(AppState::InGame))
+                .run_if(pause_menu_hidden)
+                .run_if(settings_menu_hidden),
         );
         app.add_systems(
             Update,
@@ -60,7 +76,9 @@ impl Plugin for DevPanelPlugin {
                 update_planet_detail_frequency,
                 sync_lod_settings_from_panel,
             )
-                .run_if(in_state(AppState::InGame)),
+                .run_if(in_state(AppState::InGame))
+                .run_if(pause_menu_hidden)
+                .run_if(settings_menu_hidden),
         );
     }
 }
@@ -705,18 +723,42 @@ fn toggle_panel_visibility(
     mut query: Query<&mut Node, With<DevPanelRoot>>,
 ) {
     if keys.just_pressed(KeyCode::F1) {
-        state.open = !state.open;
-        state.active_input = None;
-        state.active_slider = None;
-
-        if let Ok(mut node) = query.single_mut() {
-            node.display = if state.open {
-                Display::Flex
-            } else {
-                Display::None
-            };
+        if let Some(mut node) = query.iter_mut().next() {
+            let open = !state.open;
+            apply_panel_visibility(&mut state, &mut node, open);
         }
     }
+}
+
+fn handle_panel_commands(
+    mut events: MessageReader<DevPanelCommand>,
+    mut state: ResMut<DevPanelState>,
+    mut query: Query<&mut Node, With<DevPanelRoot>>,
+) {
+    let state_ref = &mut *state;
+    for command in events.read() {
+        if let Some(mut node) = query.iter_mut().next() {
+            match command {
+                DevPanelCommand::Show => apply_panel_visibility(state_ref, &mut node, true),
+                DevPanelCommand::Hide => apply_panel_visibility(state_ref, &mut node, false),
+                DevPanelCommand::Toggle => {
+                    let next = !state_ref.open;
+                    apply_panel_visibility(state_ref, &mut node, next);
+                }
+            }
+        }
+    }
+}
+
+fn apply_panel_visibility(state: &mut DevPanelState, node: &mut Node, open: bool) {
+    state.open = open;
+    state.active_input = None;
+    state.active_slider = None;
+    node.display = if open {
+        Display::Flex
+    } else {
+        Display::None
+    };
 }
 
 fn update_fps_display(
