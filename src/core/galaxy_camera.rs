@@ -121,8 +121,10 @@ fn camera_controller_system(
             let mut free = state.free;
 
             if buttons.pressed(MouseButton::Right) {
-                free.yaw = wrap_angle(free.yaw + mouse_delta.x * FREE_ROT_SPEED);
-                free.pitch = (free.pitch - mouse_delta.y * FREE_ROT_SPEED).clamp(-1.55, -0.15);
+                let sens = mouse_sensitivity_scale(free.distance, params.radius);
+                free.yaw = wrap_angle(free.yaw + mouse_delta.x * FREE_ROT_SPEED * sens);
+                free.pitch =
+                    (free.pitch - mouse_delta.y * FREE_ROT_SPEED * sens).clamp(-1.55, -0.15);
             }
 
             // WASD/QE planar movement
@@ -232,8 +234,10 @@ fn camera_controller_system(
             let center = target_tf.translation();
 
             if buttons.pressed(MouseButton::Right) {
-                orbit.longitude = wrap_angle(orbit.longitude + mouse_delta.x * ORBIT_ROT_SPEED);
-                orbit.latitude = (orbit.latitude - mouse_delta.y * ORBIT_ROT_SPEED)
+                let sens = mouse_sensitivity_scale(orbit.altitude + orbit.radius, params.radius);
+                orbit.longitude =
+                    wrap_angle(orbit.longitude + mouse_delta.x * ORBIT_ROT_SPEED * sens);
+                orbit.latitude = (orbit.latitude - mouse_delta.y * ORBIT_ROT_SPEED * sens)
                     .clamp(-ORBIT_LAT_LIMIT, ORBIT_LAT_LIMIT);
             }
 
@@ -374,4 +378,13 @@ fn wrap_angle(mut a: f32) -> f32 {
         a += std::f32::consts::TAU;
     }
     a
+}
+
+fn mouse_sensitivity_scale(distance: f32, radius: f32) -> f32 {
+    let base = radius.max(1.0);
+    let ratio = (distance / base).clamp(0.0, 12.0);
+    let t = (ratio / 6.0).clamp(0.0, 1.0);
+    let min = 0.2;
+    let max = 1.6;
+    min + (max - min) * t
 }

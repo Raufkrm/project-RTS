@@ -1,6 +1,6 @@
 # Planet Context Streaming & LOD Roadmap
 
-Last updated: 2025-10-29
+Last updated: 2025-11-02
 
 ## Goals
 - Seamless zoom from orbit → surface with appropriate geometry/material detail.
@@ -51,20 +51,20 @@ Last updated: 2025-10-29
 ## Implementation Phases
 
 1. **Scaffolding**
-   - [ ] Introduce `PlanetContext` resource tracking active layer & thresholds.
-   - [ ] Move prototype `PatchGrid`/`terrain_stream` into a dedicated `planet_surface` module.
+   - [x] Introduce `PlanetContext` resource tracking active layer & thresholds.
+   - [x] Replace legacy `terrain_stream` prototype with dedicated `planet_surface` module.
    - [ ] Add debug overlay (rings + text) showing current context & target LOD.
 
 2. **Streaming Core**
-   - [ ] Implement `PlanetPatchDescriptor` (quadtree index, bounding sphere, parent).
-   - [ ] Add async loader stub reading simple JSON/ron descriptors from `assets/planet_patches/`.
-   - [ ] Hook loader into Bevy asset system or custom resource queue.
-   - [ ] Integrate cache + eviction metrics.
+   - [x] Implement `PlanetPatchDescriptor` (quadtree index, bounding sphere, parent).
+   - [x] Add async loader stub reading simple JSON/ron descriptors from `assets/planet_patches/`.
+   - [x] Hook loader into Bevy asset system or custom resource queue.
+   - [x] Integrate cache + eviction metrics.
 
 3. **Renderer Integration**
    - [ ] Replace `spawn_random_planet_inner` surface mesh with orbit shell entity + LOD controller child.
    - [ ] Spawn/unspawn patch entities as streamer reports readiness.
-   - [ ] Apply simple geomorph (blend between orbit radius and patch heights).
+   - [x] Apply simple geomorph (blend between orbit radius and patch heights).
 
 4. **Gameplay Context**
    - [ ] On entering Surface context, spawn gameplay ECS (units, resources) scoped to active patches.
@@ -76,12 +76,9 @@ Last updated: 2025-10-29
    - [ ] Optional: integrate procedural decals or masks for variety.
 
 ## Immediate Next Steps
-1. Create `planet_surface` module with:
-   - `lod::` quadtree descriptors
-   - `stream::` request/response layer
-   - `render::` patch entity manager
-2. Adapt `terrain_stream.rs` prototype to operate on camera altitude (not editor camera).
-3. Expose debug toggles in dev panel for context thresholds and patch stats.
+1. Surface the morph/perf telemetry in the dev panel so we can monitor GPU morph behaviour without tailing logs.
+2. Expose per-patch material overrides (palette + detail tweaks) through streaming metadata and the dev panel so designers can steer variants.
+3. Replace the orbit shell mesh with the streamed LOD controller child once coverage is stable, adding a short cross-fade to mask the hand-off.
 
 ## Open Questions
 - Where do baked patches come from? (Need tooling: offline generator vs. runtime procedural bake.)
@@ -90,5 +87,4 @@ Last updated: 2025-10-29
 
 ## References
 - `Lod_context.txt` (concept narrative).
-- `src/game/world/terrain_stream.rs` (prototype streaming logic).
 - Bevy docs: AssetLoader traits, `IoTaskPool`, `World::resource_scope`.

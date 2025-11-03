@@ -5,6 +5,7 @@
 //! without pulling in unfinished logic.  The real implementation will land in
 //! follow-up PRs.
 
+pub mod asset_loader;
 pub mod lod;
 pub mod manager;
 pub mod procedural_loader;

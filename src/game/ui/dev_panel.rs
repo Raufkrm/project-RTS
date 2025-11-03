@@ -1,18 +1,22 @@
-use std::fmt::Write as _;
+use std::{collections::VecDeque, fmt::Write as _};
 
-use bevy::input::mouse::MouseButton;
+use bevy::input::mouse::{MouseButton, MouseScrollUnit, MouseWheel};
 use bevy::log::{info, warn};
 use bevy::pbr::MeshMaterial3d;
 use bevy::prelude::*;
-use bevy::ui::RelativeCursorPosition;
+use bevy::ui::{ComputedNode, FocusPolicy, Overflow, RelativeCursorPosition};
 
 use crate::app::AppState;
 use crate::core::galaxy_camera::MainCamera;
-use crate::game::planet_surface::manager::{
-    PlanetContext, PlanetContextLayer, PlanetLodConfig, DEFAULT_APPROACH_ERROR_THRESHOLD,
-    DEFAULT_SURFACE_ERROR_THRESHOLD,
+use crate::game::planet_surface::{
+    manager::{
+        PlanetContext, PlanetContextLayer, PlanetLodConfig, DEFAULT_APPROACH_ERROR_THRESHOLD,
+        DEFAULT_APPROACH_FALLOFF_KM, DEFAULT_MAX_APPROACH_LEVEL, DEFAULT_MAX_SURFACE_LEVEL,
+        DEFAULT_SURFACE_ERROR_THRESHOLD, DEFAULT_SURFACE_FALLOFF_KM, DEFAULT_SURFACE_MIN_LEVEL,
+    },
+    procedural_loader::ClimateProfiler,
+    render::{PatchCacheMetrics, PatchStats},
 };
-use crate::game::planet_surface::render::PatchStats;
 use crate::game::world::planet::{
     analyze_planet_climate, apply_guardrail_adjustment, guardrail_adjustment_from_summaries,
     guardrail_adjustment_from_summary, log_planet_configuration, spawn_random_planet_inner,
@@ -28,6 +32,7 @@ pub struct DevPanelPlugin;
 impl Plugin for DevPanelPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<DevPanelState>()
+            .init_resource::<DevPanelScrollState>()
             .init_resource::<PlanetSettings>()
             .add_systems(
                 OnEnter(AppState::InGame),
@@ -56,10 +61,11 @@ impl Plugin for DevPanelPlugin {
         );
         app.add_systems(
             Update,
-            (
-                update_planet_detail_frequency,
-                sync_lod_settings_from_panel,
-            )
+            handle_dev_panel_scroll.run_if(in_state(AppState::InGame)),
+        );
+        app.add_systems(
+            Update,
+            (update_planet_detail_frequency, sync_lod_settings_from_panel)
                 .run_if(in_state(AppState::InGame)),
         );
     }
@@ -88,10 +94,31 @@ struct DevPanelState {
     patches_requested: usize,
     lod_surface_error: f32,
     lod_approach_error: f32,
+    lod_surface_falloff_km: f32,
+    lod_surface_min_level: f32,
+    lod_approach_falloff_km: f32,
+    lod_max_surface_level: u8,
+    lod_max_approach_level: u8,
+    lod_max_requested_level: u8,
+    cache_disk_hits: u64,
+    cache_disk_misses: u64,
+    cache_procedural_builds: u64,
+    cache_procedural_failures: u64,
+    cache_evictions: u64,
+    cache_active_patches: usize,
+    cache_max_budget: usize,
+    cache_spawn_budget: u32,
+    cache_active_history: String,
+    cache_spawn_history: String,
+    cache_morph_last_ms: f32,
+    cache_morph_avg_ms: f32,
 
     dirty: bool,
     active_slider: Option<ParameterKind>,
     active_input: Option<ActiveInput>,
+    detail_freq_smooth: f32,
+    detail_amp_smooth: f32,
+    detail_scale_smooth: f32,
 }
 
 impl Default for DevPanelState {
@@ -117,9 +144,30 @@ impl Default for DevPanelState {
             patches_requested: 0,
             lod_surface_error: DEFAULT_SURFACE_ERROR_THRESHOLD,
             lod_approach_error: DEFAULT_APPROACH_ERROR_THRESHOLD,
+            lod_surface_falloff_km: DEFAULT_SURFACE_FALLOFF_KM,
+            lod_surface_min_level: DEFAULT_SURFACE_MIN_LEVEL as f32,
+            lod_approach_falloff_km: DEFAULT_APPROACH_FALLOFF_KM,
+            lod_max_surface_level: DEFAULT_MAX_SURFACE_LEVEL,
+            lod_max_approach_level: DEFAULT_MAX_APPROACH_LEVEL,
+            lod_max_requested_level: 0,
+            cache_disk_hits: 0,
+            cache_disk_misses: 0,
+            cache_procedural_builds: 0,
+            cache_procedural_failures: 0,
+            cache_evictions: 0,
+            cache_active_patches: 0,
+            cache_max_budget: 0,
+            cache_spawn_budget: 0,
+            cache_active_history: "-".to_string(),
+            cache_spawn_history: "-".to_string(),
+            cache_morph_last_ms: 0.0,
+            cache_morph_avg_ms: 0.0,
             dirty: false,
             active_slider: None,
             active_input: None,
+            detail_freq_smooth: 1.0,
+            detail_amp_smooth: 0.04,
+            detail_scale_smooth: 9.0,
         }
     }
 }
@@ -150,6 +198,9 @@ enum ParameterKind {
     SunBrightness,
     LodSurfaceError,
     LodApproachError,
+    LodSurfaceFalloff,
+    LodSurfaceMinLevel,
+    LodApproachFalloff,
 }
 
 #[derive(Clone, Copy)]
@@ -203,7 +254,7 @@ impl ParameterDescriptor {
     }
 }
 
-const PARAM_DESCRIPTORS: [ParameterDescriptor; 12] = [
+const PARAM_DESCRIPTORS: [ParameterDescriptor; 15] = [
     ParameterDescriptor {
         kind: ParameterKind::WaterLevel,
         label: "Water Level",
@@ -300,6 +351,30 @@ const PARAM_DESCRIPTORS: [ParameterDescriptor; 12] = [
         log_scale: false,
         precision: 3,
     },
+    ParameterDescriptor {
+        kind: ParameterKind::LodSurfaceFalloff,
+        label: "LOD Surface Falloff (km)",
+        min: 2.0,
+        max: 200.0,
+        log_scale: false,
+        precision: 1,
+    },
+    ParameterDescriptor {
+        kind: ParameterKind::LodSurfaceMinLevel,
+        label: "LOD Surface Min Level",
+        min: 0.0,
+        max: DEFAULT_MAX_SURFACE_LEVEL as f32,
+        log_scale: false,
+        precision: 0,
+    },
+    ParameterDescriptor {
+        kind: ParameterKind::LodApproachFalloff,
+        label: "LOD Approach Falloff (km)",
+        min: 20.0,
+        max: 800.0,
+        log_scale: false,
+        precision: 1,
+    },
 ];
 
 const SEED_SWEEP_COUNT: u32 = 24;
@@ -307,6 +382,9 @@ const PANEL_WIDTH: f32 = 320.0;
 const SLIDER_WIDTH: f32 = 180.0;
 const SLIDER_HEIGHT: f32 = 6.0;
 const HANDLE_WIDTH: f32 = 12.0;
+const PANEL_SCROLL_HEIGHT: f32 = 560.0;
+const HISTORY_LEN: usize = 40;
+const SPARKLINE_CHARS: [char; 8] = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
 const AUTOBALANCE_SWEEP_COUNT: u32 = 6;
 const DIGIT_KEYS: &[(KeyCode, char)] = &[
     (KeyCode::Digit0, '0'),
@@ -378,6 +456,17 @@ struct ParameterInput {
     descriptor: ParameterDescriptor,
 }
 
+#[derive(Component)]
+struct DevPanelScrollViewport;
+
+#[derive(Component)]
+struct DevPanelScrollContent;
+
+#[derive(Resource, Default)]
+struct DevPanelScrollState {
+    offset: f32,
+}
+
 fn descriptor_for(kind: ParameterKind) -> ParameterDescriptor {
     PARAM_DESCRIPTORS
         .iter()
@@ -396,10 +485,45 @@ fn cleanup_panel(
     }
 }
 
+fn handle_dev_panel_scroll(
+    mut wheel_events: MessageReader<MouseWheel>,
+    mut scroll_state: ResMut<DevPanelScrollState>,
+    viewport_q: Query<(&Interaction, &ComputedNode), With<DevPanelScrollViewport>>,
+    mut content_q: Query<(&ComputedNode, &mut Transform), With<DevPanelScrollContent>>,
+) {
+    let Ok((interaction, viewport_node)) = viewport_q.single() else {
+        return;
+    };
+    if !matches!(*interaction, Interaction::Hovered) {
+        return;
+    }
+
+    let mut delta = 0.0f32;
+    for event in wheel_events.read() {
+        let step = match event.unit {
+            MouseScrollUnit::Line => event.y * 40.0,
+            MouseScrollUnit::Pixel => event.y,
+        };
+        delta += step;
+    }
+    if delta.abs() <= f32::EPSILON {
+        return;
+    }
+
+    let Ok((content_node, mut transform)) = content_q.single_mut() else {
+        return;
+    };
+
+    let max_scroll = (content_node.size.y - viewport_node.size.y).max(0.0);
+    scroll_state.offset = (scroll_state.offset + delta).clamp(-max_scroll, 0.0);
+    transform.translation.y = scroll_state.offset;
+}
+
 fn spawn_dev_panel(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut state: ResMut<DevPanelState>,
+    mut scroll_state: ResMut<DevPanelScrollState>,
     map: Res<MapSettings>,
     params: Res<PlanetParams>,
     settings: Res<PlanetSettings>,
@@ -430,6 +554,13 @@ fn spawn_dev_panel(
     state.patches_requested = 0;
     state.lod_surface_error = lod.surface_error;
     state.lod_approach_error = lod.approach_error;
+    state.lod_surface_falloff_km = lod.surface_falloff_km;
+    state.lod_surface_min_level = lod.surface_min_level as f32;
+    state.lod_approach_falloff_km = lod.approach_falloff_km;
+    state.lod_max_surface_level = lod.max_surface_level;
+    state.lod_max_approach_level = lod.max_approach_level;
+    state.lod_max_requested_level = 0;
+    scroll_state.offset = 0.0;
 
     let font = asset_server.load("fonts/arial.ttf");
 
@@ -473,7 +604,14 @@ fn spawn_dev_panel(
             ));
 
             panel.spawn((
-                Text::new("Context: Orbit | Surface patches: 0 / 0"),
+                Text::new(
+                    "Context: Orbit | Surface patches: 0 / 0\n\
+                     LOD: cap Approach L0 | Surface L0 (min L0)\n\
+                     Cache: disk 0 hit / 0 miss | proc 0 builds / 0 fail | evict 0\n\
+                     Active patches: 0 / 0 | spawn budget 0\n\
+                     Hist active: - | Hist spawn: -\n\
+                     Morph CPU: 0.000 ms last | 0.000 ms avg",
+                ),
                 TextFont {
                     font: font.clone(),
                     font_size: 15.0,
@@ -485,217 +623,278 @@ fn spawn_dev_panel(
 
             panel
                 .spawn((
+                    DevPanelScrollViewport,
+                    Interaction::default(),
+                    FocusPolicy::Block,
                     Node {
-                        flex_direction: FlexDirection::Row,
-                        align_items: AlignItems::Center,
-                        column_gap: Val::Px(10.0),
+                        width: Val::Percent(100.0),
+                        max_height: Val::Px(PANEL_SCROLL_HEIGHT),
+                        flex_direction: FlexDirection::Column,
+                        row_gap: Val::Px(12.0),
+                        overflow: Overflow::clip_y(),
                         ..default()
                     },
-                    Name::new("SeedRow"),
+                    Name::new("DevPanelScrollViewport"),
                 ))
-                .with_children(|row| {
-                    row.spawn((
-                        Text::new("Seed"),
-                        TextFont {
-                            font: font.clone(),
-                            font_size: 16.0,
-                            ..default()
-                        },
-                        TextColor(Color::srgba(0.9, 0.9, 0.9, 1.0)),
-                    ));
-
-                    row.spawn((
-                        SeedInput,
-                        Button,
-                        Interaction::default(),
-                        Node {
-                            width: Val::Px(120.0),
-                            height: Val::Px(26.0),
-                            align_items: AlignItems::Center,
-                            justify_content: JustifyContent::Start,
-                            padding: UiRect::horizontal(Val::Px(8.0)),
-                            ..default()
-                        },
-                        BackgroundColor(Color::srgba(0.16, 0.16, 0.22, 1.0)),
-                        BorderColor::all(Color::srgba(0.55, 0.55, 0.75, 1.0)),
-                        Name::new("SeedInput"),
-                    ))
-                    .with_children(|input| {
-                        input.spawn((
-                            SeedText,
-                            Text::new(map.seed.to_string()),
-                            TextFont {
-                                font: font.clone(),
-                                font_size: 16.0,
-                                ..default()
-                            },
-                            TextColor(Color::srgba(0.95, 0.95, 0.95, 1.0)),
-                        ));
-                    });
-
-                    row.spawn((
-                        RerollButton,
-                        Button,
-                        Interaction::default(),
-                        Node {
-                            padding: UiRect::axes(Val::Px(12.0), Val::Px(6.0)),
-                            ..default()
-                        },
-                        BackgroundColor(Color::srgba(0.85, 0.65, 0.1, 1.0)),
-                        BorderColor::all(Color::srgba(1.0, 0.85, 0.25, 1.0)),
-                        Name::new("RerollButton"),
-                    ))
-                    .with_children(|button| {
-                        button.spawn((
-                            Text::new("Reroll"),
-                            TextFont {
-                                font: font.clone(),
-                                font_size: 16.0,
-                                ..default()
-                            },
-                            TextColor(Color::srgba(0.1, 0.1, 0.15, 1.0)),
-                        ));
-                    });
-
-                    row.spawn((
-                        SeedSweepButton,
-                        Button,
-                        Interaction::default(),
-                        Node {
-                            padding: UiRect::axes(Val::Px(10.0), Val::Px(6.0)),
-                            ..default()
-                        },
-                        BackgroundColor(Color::srgba(0.25, 0.55, 0.95, 1.0)),
-                        BorderColor::all(Color::srgba(0.45, 0.75, 1.0, 1.0)),
-                        Name::new("SeedSweepButton"),
-                    ))
-                    .with_children(|button| {
-                        button.spawn((
-                            Text::new("Sweep ×24"),
-                            TextFont {
-                                font: font.clone(),
-                                font_size: 16.0,
-                                ..default()
-                            },
-                            TextColor(Color::srgba(0.06, 0.1, 0.18, 1.0)),
-                        ));
-                    });
-                });
-
-            panel.spawn((
-                Node {
-                    width: Val::Percent(100.0),
-                    height: Val::Px(1.0),
-                    ..default()
-                },
-                BackgroundColor(Color::srgba(0.25, 0.25, 0.35, 0.9)),
-                Name::new("Divider"),
-            ));
-
-            panel.spawn((
-                Text::new("PLANET"),
-                TextFont {
-                    font: font.clone(),
-                    font_size: 17.0,
-                    ..default()
-                },
-                TextColor(Color::srgba(0.95, 0.95, 0.95, 1.0)),
-            ));
-
-            for descriptor in PARAM_DESCRIPTORS.iter().copied() {
-                panel
-                    .spawn((
-                        Node {
-                            flex_direction: FlexDirection::Column,
-                            row_gap: Val::Px(6.0),
-                            ..default()
-                        },
-                        Name::new(format!("{} Row", descriptor.label)),
-                    ))
-                    .with_children(|row| {
-                        row.spawn((
-                            Text::new(descriptor.label),
-                            TextFont {
-                                font: font.clone(),
-                                font_size: 15.0,
-                                ..default()
-                            },
-                            TextColor(Color::srgba(0.92, 0.92, 0.96, 1.0)),
-                        ));
-
-                        row.spawn((
+                .with_children(|viewport| {
+                    viewport
+                        .spawn((
+                            DevPanelScrollContent,
                             Node {
-                                flex_direction: FlexDirection::Row,
-                                align_items: AlignItems::Center,
-                                column_gap: Val::Px(10.0),
+                                width: Val::Percent(100.0),
+                                flex_direction: FlexDirection::Column,
+                                row_gap: Val::Px(12.0),
                                 ..default()
                             },
-                            Name::new(format!("{} Controls", descriptor.label)),
+                            Name::new("DevPanelScrollContent"),
                         ))
-                        .with_children(|controls| {
-                            controls
+                        .with_children(|content| {
+                            content
                                 .spawn((
-                                    ParameterSlider { descriptor },
-                                    RelativeCursorPosition::default(),
-                                    Interaction::default(),
                                     Node {
-                                        width: Val::Px(SLIDER_WIDTH),
-                                        height: Val::Px(SLIDER_HEIGHT),
-                                        position_type: PositionType::Relative,
-                                        ..default()
-                                    },
-                                    BackgroundColor(Color::srgba(0.2, 0.2, 0.3, 1.0)),
-                                    BorderColor::all(Color::srgba(0.45, 0.45, 0.6, 1.0)),
-                                    Name::new(format!("{} Slider", descriptor.label)),
-                                ))
-                                .with_children(|track| {
-                                    track.spawn((
-                                        SliderHandle,
-                                        Node {
-                                            width: Val::Px(HANDLE_WIDTH),
-                                            height: Val::Px(HANDLE_WIDTH),
-                                            position_type: PositionType::Absolute,
-                                            top: Val::Px(-(HANDLE_WIDTH - SLIDER_HEIGHT) * 0.5),
-                                            left: Val::Px(0.0),
-                                            ..default()
-                                        },
-                                        BackgroundColor(Color::srgba(0.9, 0.7, 0.25, 1.0)),
-                                        BorderColor::all(Color::srgba(1.0, 0.9, 0.45, 1.0)),
-                                    ));
-                                });
-
-                            controls
-                                .spawn((
-                                    ParameterInput { descriptor },
-                                    Button,
-                                    Interaction::default(),
-                                    Node {
-                                        width: Val::Px(90.0),
-                                        height: Val::Px(26.0),
+                                        flex_direction: FlexDirection::Row,
                                         align_items: AlignItems::Center,
-                                        justify_content: JustifyContent::Start,
-                                        padding: UiRect::horizontal(Val::Px(8.0)),
+                                        column_gap: Val::Px(10.0),
                                         ..default()
                                     },
-                                    BackgroundColor(Color::srgba(0.13, 0.13, 0.19, 1.0)),
-                                    BorderColor::all(Color::srgba(0.5, 0.5, 0.7, 1.0)),
-                                    Name::new(format!("{} Input", descriptor.label)),
+                                    Name::new("SeedRow"),
                                 ))
-                                .with_children(|input| {
-                                    input.spawn((
-                                        ParameterValueText { descriptor },
-                                        Text::new(descriptor.format_value(descriptor.min)),
+                                .with_children(|row| {
+                                    row.spawn((
+                                        Text::new("Seed"),
                                         TextFont {
                                             font: font.clone(),
-                                            font_size: 15.0,
+                                            font_size: 16.0,
                                             ..default()
                                         },
-                                        TextColor(Color::srgba(0.95, 0.95, 0.95, 1.0)),
+                                        TextColor(Color::srgba(0.9, 0.9, 0.9, 1.0)),
                                     ));
+
+                                    row.spawn((
+                                        SeedInput,
+                                        Button,
+                                        Interaction::default(),
+                                        Node {
+                                            width: Val::Px(120.0),
+                                            height: Val::Px(26.0),
+                                            align_items: AlignItems::Center,
+                                            justify_content: JustifyContent::Start,
+                                            padding: UiRect::horizontal(Val::Px(8.0)),
+                                            ..default()
+                                        },
+                                        BackgroundColor(Color::srgba(0.16, 0.16, 0.22, 1.0)),
+                                        BorderColor::all(Color::srgba(0.55, 0.55, 0.75, 1.0)),
+                                        Name::new("SeedInput"),
+                                    ))
+                                    .with_children(|input| {
+                                        input.spawn((
+                                            SeedText,
+                                            Text::new(map.seed.to_string()),
+                                            TextFont {
+                                                font: font.clone(),
+                                                font_size: 16.0,
+                                                ..default()
+                                            },
+                                            TextColor(Color::srgba(0.95, 0.95, 0.95, 1.0)),
+                                        ));
+                                    });
+
+                                    row.spawn((
+                                        RerollButton,
+                                        Button,
+                                        Interaction::default(),
+                                        Node {
+                                            padding: UiRect::axes(Val::Px(12.0), Val::Px(6.0)),
+                                            ..default()
+                                        },
+                                        BackgroundColor(Color::srgba(0.85, 0.65, 0.1, 1.0)),
+                                        BorderColor::all(Color::srgba(1.0, 0.85, 0.25, 1.0)),
+                                        Name::new("RerollButton"),
+                                    ))
+                                    .with_children(|button| {
+                                        button.spawn((
+                                            Text::new("Reroll"),
+                                            TextFont {
+                                                font: font.clone(),
+                                                font_size: 16.0,
+                                                ..default()
+                                            },
+                                            TextColor(Color::srgba(0.1, 0.1, 0.15, 1.0)),
+                                        ));
+                                    });
+
+                                    row.spawn((
+                                        SeedSweepButton,
+                                        Button,
+                                        Interaction::default(),
+                                        Node {
+                                            padding: UiRect::axes(Val::Px(10.0), Val::Px(6.0)),
+                                            ..default()
+                                        },
+                                        BackgroundColor(Color::srgba(0.25, 0.55, 0.95, 1.0)),
+                                        BorderColor::all(Color::srgba(0.45, 0.75, 1.0, 1.0)),
+                                        Name::new("SeedSweepButton"),
+                                    ))
+                                    .with_children(|button| {
+                                        button.spawn((
+                                            Text::new("Sweep x24"),
+                                            TextFont {
+                                                font: font.clone(),
+                                                font_size: 16.0,
+                                                ..default()
+                                            },
+                                            TextColor(Color::srgba(0.06, 0.1, 0.18, 1.0)),
+                                        ));
+                                    });
                                 });
+
+                            content.spawn((
+                                Node {
+                                    width: Val::Percent(100.0),
+                                    height: Val::Px(1.0),
+                                    ..default()
+                                },
+                                BackgroundColor(Color::srgba(0.25, 0.25, 0.35, 0.9)),
+                                Name::new("Divider"),
+                            ));
+
+                            content.spawn((
+                                Text::new("PLANET"),
+                                TextFont {
+                                    font: font.clone(),
+                                    font_size: 17.0,
+                                    ..default()
+                                },
+                                TextColor(Color::srgba(0.95, 0.95, 0.95, 1.0)),
+                            ));
+
+                            for descriptor in PARAM_DESCRIPTORS.iter().copied() {
+                                content
+                                    .spawn((
+                                        Node {
+                                            flex_direction: FlexDirection::Column,
+                                            row_gap: Val::Px(6.0),
+                                            ..default()
+                                        },
+                                        Name::new(format!("{} Row", descriptor.label)),
+                                    ))
+                                    .with_children(|row| {
+                                        row.spawn((
+                                            Text::new(descriptor.label),
+                                            TextFont {
+                                                font: font.clone(),
+                                                font_size: 15.0,
+                                                ..default()
+                                            },
+                                            TextColor(Color::srgba(0.92, 0.92, 0.96, 1.0)),
+                                        ));
+
+                                        row.spawn((
+                                            Node {
+                                                flex_direction: FlexDirection::Row,
+                                                align_items: AlignItems::Center,
+                                                column_gap: Val::Px(10.0),
+                                                ..default()
+                                            },
+                                            Name::new(format!("{} Controls", descriptor.label)),
+                                        ))
+                                        .with_children(
+                                            |controls| {
+                                                controls
+                                                    .spawn((
+                                                        ParameterSlider { descriptor },
+                                                        RelativeCursorPosition::default(),
+                                                        Interaction::default(),
+                                                        Node {
+                                                            width: Val::Px(SLIDER_WIDTH),
+                                                            height: Val::Px(SLIDER_HEIGHT),
+                                                            position_type: PositionType::Relative,
+                                                            ..default()
+                                                        },
+                                                        BackgroundColor(Color::srgba(
+                                                            0.2, 0.2, 0.3, 1.0,
+                                                        )),
+                                                        BorderColor::all(Color::srgba(
+                                                            0.45, 0.45, 0.6, 1.0,
+                                                        )),
+                                                        Name::new(format!(
+                                                            "{} Slider",
+                                                            descriptor.label
+                                                        )),
+                                                    ))
+                                                    .with_children(|track| {
+                                                        track.spawn((
+                                                            SliderHandle,
+                                                            Node {
+                                                                width: Val::Px(HANDLE_WIDTH),
+                                                                height: Val::Px(HANDLE_WIDTH),
+                                                                position_type:
+                                                                    PositionType::Absolute,
+                                                                top: Val::Px(
+                                                                    -(HANDLE_WIDTH - SLIDER_HEIGHT)
+                                                                        * 0.5,
+                                                                ),
+                                                                left: Val::Px(0.0),
+                                                                ..default()
+                                                            },
+                                                            BackgroundColor(Color::srgba(
+                                                                0.9, 0.7, 0.25, 1.0,
+                                                            )),
+                                                            BorderColor::all(Color::srgba(
+                                                                1.0, 0.9, 0.45, 1.0,
+                                                            )),
+                                                        ));
+                                                    });
+
+                                                controls
+                                                    .spawn((
+                                                        ParameterInput { descriptor },
+                                                        Button,
+                                                        Interaction::default(),
+                                                        Node {
+                                                            width: Val::Px(90.0),
+                                                            height: Val::Px(26.0),
+                                                            align_items: AlignItems::Center,
+                                                            justify_content: JustifyContent::Start,
+                                                            padding: UiRect::horizontal(Val::Px(
+                                                                8.0,
+                                                            )),
+                                                            ..default()
+                                                        },
+                                                        BackgroundColor(Color::srgba(
+                                                            0.13, 0.13, 0.19, 1.0,
+                                                        )),
+                                                        BorderColor::all(Color::srgba(
+                                                            0.5, 0.5, 0.7, 1.0,
+                                                        )),
+                                                        Name::new(format!(
+                                                            "{} Input",
+                                                            descriptor.label
+                                                        )),
+                                                    ))
+                                                    .with_children(|input| {
+                                                        input.spawn((
+                                                            ParameterValueText { descriptor },
+                                                            Text::new(
+                                                                descriptor
+                                                                    .format_value(descriptor.min),
+                                                            ),
+                                                            TextFont {
+                                                                font: font.clone(),
+                                                                font_size: 15.0,
+                                                                ..default()
+                                                            },
+                                                            TextColor(Color::srgba(
+                                                                0.95, 0.95, 0.95, 1.0,
+                                                            )),
+                                                        ));
+                                                    });
+                                            },
+                                        );
+                                    });
+                            }
                         });
-                    });
-            }
+                });
         });
 }
 
@@ -703,6 +902,8 @@ fn toggle_panel_visibility(
     keys: Res<ButtonInput<KeyCode>>,
     mut state: ResMut<DevPanelState>,
     mut query: Query<&mut Node, With<DevPanelRoot>>,
+    mut scroll_state: ResMut<DevPanelScrollState>,
+    mut content_q: Query<&mut Transform, With<DevPanelScrollContent>>,
 ) {
     if keys.just_pressed(KeyCode::F1) {
         state.open = !state.open;
@@ -715,15 +916,73 @@ fn toggle_panel_visibility(
             } else {
                 Display::None
             };
+            if state.open {
+                scroll_state.offset = 0.0;
+                if let Ok(mut transform) = content_q.single_mut() {
+                    transform.translation.y = 0.0;
+                }
+            }
         }
     }
+}
+
+fn sparkline(values: &[f32]) -> String {
+    if values.is_empty() {
+        return "-".to_string();
+    }
+    let mut min = values[0];
+    let mut max = values[0];
+    for &value in values.iter().skip(1) {
+        if value < min {
+            min = value;
+        }
+        if value > max {
+            max = value;
+        }
+    }
+    let range = (max - min).max(1e-5);
+    let mut output = String::with_capacity(values.len());
+    for &value in values {
+        let idx = if range <= 1e-5 {
+            SPARKLINE_CHARS.len() / 2
+        } else {
+            let norm = (value - min) / range;
+            let scaled = norm * (SPARKLINE_CHARS.len() - 1) as f32;
+            scaled
+                .round()
+                .clamp(0.0, (SPARKLINE_CHARS.len() - 1) as f32) as usize
+        };
+        output.push(SPARKLINE_CHARS[idx]);
+    }
+    output
+}
+
+fn sparkline_from_usize(data: &VecDeque<usize>) -> String {
+    if data.is_empty() {
+        return "-".to_string();
+    }
+    let start = data.len().saturating_sub(HISTORY_LEN);
+    let slice: Vec<f32> = data.iter().skip(start).map(|&value| value as f32).collect();
+    sparkline(&slice)
+}
+
+fn sparkline_from_u32(data: &VecDeque<u32>) -> String {
+    if data.is_empty() {
+        return "-".to_string();
+    }
+    let start = data.len().saturating_sub(HISTORY_LEN);
+    let slice: Vec<f32> = data.iter().skip(start).map(|&value| value as f32).collect();
+    sparkline(&slice)
 }
 
 fn update_fps_display(
     time: Res<Time>,
     params: Res<PlanetParams>,
     context: Res<PlanetContext>,
+    lod: Res<PlanetLodConfig>,
     stats: Res<PatchStats>,
+    metrics: Res<PatchCacheMetrics>,
+    _profiler: Res<ClimateProfiler>,
     mut state: ResMut<DevPanelState>,
     mut texts: ParamSet<(
         Query<&mut Text, With<FpsText>>,
@@ -737,6 +996,32 @@ fn update_fps_display(
     state.context_layer = context.layer;
     state.patches_loaded = stats.loaded;
     state.patches_requested = stats.requested;
+    state.lod_max_surface_level = lod.max_surface_level;
+    state.lod_max_approach_level = lod.max_approach_level;
+    state.lod_max_requested_level = context.max_requested_level;
+    state.cache_disk_hits = metrics.disk_hits;
+    state.cache_disk_misses = metrics.disk_misses;
+    state.cache_procedural_builds = metrics.procedural_builds;
+    state.cache_procedural_failures = metrics.procedural_failures;
+    state.cache_evictions = metrics.evictions;
+    state.cache_active_patches = metrics.active_patches;
+    state.cache_max_budget = metrics.max_active_budget;
+    state.cache_spawn_budget = metrics.spawn_budget_last;
+    state.cache_active_history = sparkline_from_usize(&metrics.active_history);
+    state.cache_spawn_history = sparkline_from_u32(&metrics.spawn_history);
+    state.cache_morph_last_ms = metrics.morph_time_last_ms;
+    state.cache_morph_avg_ms = metrics.morph_time_avg_ms;
+
+    if (state.lod_surface_falloff_km - lod.surface_falloff_km).abs() > 1e-3 {
+        state.lod_surface_falloff_km = lod.surface_falloff_km;
+    }
+    if (state.lod_approach_falloff_km - lod.approach_falloff_km).abs() > 1e-3 {
+        state.lod_approach_falloff_km = lod.approach_falloff_km;
+    }
+    let surface_min_level = lod.surface_min_level as f32;
+    if (state.lod_surface_min_level - surface_min_level).abs() > f32::EPSILON {
+        state.lod_surface_min_level = surface_min_level;
+    }
 
     let dt = time.delta_secs();
     if dt > 0.0 {
@@ -774,9 +1059,49 @@ fn update_fps_display(
             PlanetContextLayer::Approach => "Approach",
             PlanetContextLayer::Surface => "Surface",
         };
-        text.0 = format!(
+        let context_line = format!(
             "Context: {} | Surface patches: {} / {}",
             layer_label, state.patches_loaded, state.patches_requested
+        );
+        let lod_line = match state.context_layer {
+            PlanetContextLayer::Surface => format!(
+                "LOD: req L{} | cap L{} (min L{}) | falloff {:.1} km",
+                state.lod_max_requested_level,
+                lod.max_surface_level,
+                lod.surface_min_level,
+                lod.surface_falloff_km
+            ),
+            PlanetContextLayer::Approach => format!(
+                "LOD: req L{} | cap L{} | falloff {:.1} km",
+                state.lod_max_requested_level, lod.max_approach_level, lod.approach_falloff_km
+            ),
+            PlanetContextLayer::Orbit => format!(
+                "LOD: cap Approach L{} | Surface L{} (min L{})",
+                lod.max_approach_level, lod.max_surface_level, lod.surface_min_level
+            ),
+        };
+        let cache_line = format!(
+            "Cache: disk {} hit / {} miss | proc {} builds / {} fail | evict {}",
+            state.cache_disk_hits,
+            state.cache_disk_misses,
+            state.cache_procedural_builds,
+            state.cache_procedural_failures,
+            state.cache_evictions
+        );
+        let budget_line = format!(
+            "Active patches: {} / {} | spawn budget {}",
+            state.cache_active_patches, state.cache_max_budget, state.cache_spawn_budget
+        );
+        let history_line = format!(
+            "Hist active: {} | Hist spawn: {}",
+            state.cache_active_history, state.cache_spawn_history
+        );
+        let morph_line = format!(
+            "Morph CPU: {:.3} ms last | {:.3} ms avg",
+            state.cache_morph_last_ms, state.cache_morph_avg_ms
+        );
+        text.0 = format!(
+            "{context_line}\n{lod_line}\n{cache_line}\n{budget_line}\n{history_line}\n{morph_line}"
         );
     }
 }
@@ -1237,15 +1562,22 @@ fn apply_changes(
 }
 
 const DETAIL_FREQ_SURFACE_NEAR: f32 = 12.0;
-const DETAIL_ALT_BLEND_START_KM: f32 = 40.0;
-const DETAIL_ALT_BLEND_END_KM: f32 = 180.0;
+const DETAIL_ALT_BLEND_START_KM: f32 = 25.0;
+const DETAIL_ALT_BLEND_END_KM: f32 = 90.0;
+const DETAIL_SURFACE_NEAR_AMP: f32 = 0.22;
+const DETAIL_SURFACE_FAR_AMP: f32 = 0.04;
+const DETAIL_SURFACE_NEAR_SCALE: f32 = 28.0;
+const DETAIL_SURFACE_FAR_SCALE: f32 = 9.0;
+const DETAIL_SMOOTH_TAU: f32 = 0.35;
 
 fn update_planet_detail_frequency(
+    mut state: ResMut<DevPanelState>,
     planet_params: Res<PlanetParams>,
     planet_settings: Res<PlanetSettings>,
     mut materials: ResMut<Assets<PlanetSurfaceMaterial>>,
     q_planet: Query<(&GlobalTransform, &MeshMaterial3d<PlanetSurfaceMaterial>), With<PlanetTag>>,
     q_camera: Query<&GlobalTransform, With<MainCamera>>,
+    time: Res<Time>,
 ) {
     let Some(camera_tf) = q_camera.iter().next() else {
         return;
@@ -1271,13 +1603,37 @@ fn update_planet_detail_frequency(
     let orbit_freq = planet_settings.detail_freq.max(0.0001);
     let near_freq = DETAIL_FREQ_SURFACE_NEAR.max(orbit_freq);
     let target_freq = orbit_freq + (near_freq - orbit_freq) * blend;
-
+    let target_amp =
+        DETAIL_SURFACE_FAR_AMP + (DETAIL_SURFACE_NEAR_AMP - DETAIL_SURFACE_FAR_AMP) * blend;
+    let target_scale =
+        DETAIL_SURFACE_FAR_SCALE + (DETAIL_SURFACE_NEAR_SCALE - DETAIL_SURFACE_FAR_SCALE) * blend;
+    let dt = time.delta_secs().max(0.0);
+    let smoothing: f32 = if DETAIL_SMOOTH_TAU > 0.0 {
+        1.0 - (-dt / DETAIL_SMOOTH_TAU).exp()
+    } else {
+        1.0
+    };
+    let alpha = smoothing.clamp(0.0, 1.0);
+    if !state.detail_freq_smooth.is_finite() {
+        state.detail_freq_smooth = target_freq;
+    } else {
+        state.detail_freq_smooth += (target_freq - state.detail_freq_smooth) * alpha;
+    }
+    if !state.detail_amp_smooth.is_finite() {
+        state.detail_amp_smooth = target_amp;
+    } else {
+        state.detail_amp_smooth += (target_amp - state.detail_amp_smooth) * alpha;
+    }
+    if !state.detail_scale_smooth.is_finite() {
+        state.detail_scale_smooth = target_scale;
+    } else {
+        state.detail_scale_smooth += (target_scale - state.detail_scale_smooth) * alpha;
+    }
     let handle = material_handle.0.clone();
     if let Some(material) = materials.get_mut(&handle) {
-        let current = material.extension.params.detail_freq;
-        if (current - target_freq).abs() > 1e-3 {
-            material.extension.params.detail_freq = target_freq;
-        }
+        material.extension.params.detail_freq = state.detail_freq_smooth;
+        material.extension.params.surface_detail_amp = state.detail_amp_smooth;
+        material.extension.params.surface_detail_scale = state.detail_scale_smooth;
     }
 }
 
@@ -1287,6 +1643,9 @@ fn sync_lod_settings_from_panel(
 ) {
     let surface_desc = descriptor_for(ParameterKind::LodSurfaceError);
     let approach_desc = descriptor_for(ParameterKind::LodApproachError);
+    let surface_falloff_desc = descriptor_for(ParameterKind::LodSurfaceFalloff);
+    let surface_min_desc = descriptor_for(ParameterKind::LodSurfaceMinLevel);
+    let approach_falloff_desc = descriptor_for(ParameterKind::LodApproachFalloff);
 
     let surface = surface_desc.clamp(state.lod_surface_error);
     let mut approach = approach_desc.clamp(state.lod_approach_error);
@@ -1302,6 +1661,25 @@ fn sync_lod_settings_from_panel(
         state.lod_approach_error = approach;
     }
 
+    let surface_falloff = surface_falloff_desc.clamp(state.lod_surface_falloff_km);
+    if (surface_falloff - state.lod_surface_falloff_km).abs() > 1e-4 {
+        state.lod_surface_falloff_km = surface_falloff;
+    }
+
+    let mut surface_min = surface_min_desc.clamp(state.lod_surface_min_level).round();
+    let surface_max_level = lod.max_surface_level as f32;
+    if surface_min > surface_max_level {
+        surface_min = surface_max_level;
+    }
+    if (surface_min - state.lod_surface_min_level).abs() > f32::EPSILON {
+        state.lod_surface_min_level = surface_min;
+    }
+
+    let approach_falloff = approach_falloff_desc.clamp(state.lod_approach_falloff_km);
+    if (approach_falloff - state.lod_approach_falloff_km).abs() > 1e-4 {
+        state.lod_approach_falloff_km = approach_falloff;
+    }
+
     let mut changed = false;
     if (lod.surface_error - surface).abs() > 1e-5 {
         lod.surface_error = surface;
@@ -1312,9 +1690,27 @@ fn sync_lod_settings_from_panel(
         changed = true;
     }
 
+    if (lod.surface_falloff_km - surface_falloff).abs() > 1e-3 {
+        lod.surface_falloff_km = surface_falloff;
+        changed = true;
+    }
+
+    let min_level_u8 = surface_min.clamp(0.0, surface_max_level) as u8;
+    if lod.surface_min_level != min_level_u8 {
+        lod.surface_min_level = min_level_u8;
+        changed = true;
+    }
+
+    if (lod.approach_falloff_km - approach_falloff).abs() > 1e-3 {
+        lod.approach_falloff_km = approach_falloff;
+        changed = true;
+    }
+
+    state.lod_max_surface_level = lod.max_surface_level;
+    state.lod_max_approach_level = lod.max_approach_level;
+
     if changed {
-        // No additional action required; planet context will pick up the new
-        // thresholds on the next update tick.
+        // Planet context picks up the new thresholds on the next update tick.
     }
 }
 
@@ -1340,14 +1736,17 @@ impl DevPanelState {
             ParameterKind::BaseFreq => self.base_freq,
             ParameterKind::DetailFreq => self.detail_freq,
             ParameterKind::WarpFreq => self.warp_freq,
-        ParameterKind::WarpAmp => self.warp_amp,
-        ParameterKind::Mountains => self.mountain_strength,
-        ParameterKind::Rotation => self.rotation_deg,
-        ParameterKind::SunBrightness => self.sun_brightness,
-        ParameterKind::LodSurfaceError => self.lod_surface_error,
-        ParameterKind::LodApproachError => self.lod_approach_error,
+            ParameterKind::WarpAmp => self.warp_amp,
+            ParameterKind::Mountains => self.mountain_strength,
+            ParameterKind::Rotation => self.rotation_deg,
+            ParameterKind::SunBrightness => self.sun_brightness,
+            ParameterKind::LodSurfaceError => self.lod_surface_error,
+            ParameterKind::LodApproachError => self.lod_approach_error,
+            ParameterKind::LodSurfaceFalloff => self.lod_surface_falloff_km,
+            ParameterKind::LodSurfaceMinLevel => self.lod_surface_min_level,
+            ParameterKind::LodApproachFalloff => self.lod_approach_falloff_km,
+        }
     }
-}
 
     fn set_parameter(&mut self, kind: ParameterKind, value: f32) {
         let descriptor = descriptor_for(kind);
@@ -1365,11 +1764,26 @@ impl DevPanelState {
             ParameterKind::SunBrightness => &mut self.sun_brightness,
             ParameterKind::LodSurfaceError => &mut self.lod_surface_error,
             ParameterKind::LodApproachError => &mut self.lod_approach_error,
+            ParameterKind::LodSurfaceFalloff => &mut self.lod_surface_falloff_km,
+            ParameterKind::LodSurfaceMinLevel => &mut self.lod_surface_min_level,
+            ParameterKind::LodApproachFalloff => &mut self.lod_approach_falloff_km,
         };
 
-        if (clamped - *target).abs() > f32::EPSILON {
-            *target = clamped;
-            if !matches!(kind, ParameterKind::LodSurfaceError | ParameterKind::LodApproachError) {
+        let mut new_value = clamped;
+        if matches!(kind, ParameterKind::LodSurfaceMinLevel) {
+            new_value = clamped.round();
+        }
+
+        if (new_value - *target).abs() > f32::EPSILON {
+            *target = new_value;
+            if !matches!(
+                kind,
+                ParameterKind::LodSurfaceError
+                    | ParameterKind::LodApproachError
+                    | ParameterKind::LodSurfaceFalloff
+                    | ParameterKind::LodSurfaceMinLevel
+                    | ParameterKind::LodApproachFalloff
+            ) {
                 self.dirty = true;
             }
         }

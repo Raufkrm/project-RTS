@@ -51,5 +51,15 @@ fn cycle_debug_mode(keys: Res<ButtonInput<KeyCode>>, mut debug_view: ResMut<Plan
     } else if keys.just_pressed(KeyCode::F6) {
         debug_view.mode = PlanetDebugMode::None;
         info!("Planet debug view cleared");
+    } else if keys.just_pressed(KeyCode::F8) {
+        debug_view.show_skirt_debug = !debug_view.show_skirt_debug;
+        info!(
+            "Planet skirt debug overlay {}",
+            if debug_view.show_skirt_debug {
+                "enabled"
+            } else {
+                "disabled"
+            }
+        );
     }
 }

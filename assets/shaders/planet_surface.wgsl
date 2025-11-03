@@ -1,11 +1,13 @@
 #import bevy_pbr::{
-    forward_io::{FragmentOutput, VertexOutput},
+    forward_io::{FragmentOutput, Vertex, VertexOutput},
     mesh_bindings::mesh,
+    mesh_functions,
     mesh_view_bindings::view,
-    pbr_fragment::pbr_input_from_vertex_output,
+    pbr_fragment::pbr_input_from_standard_material,
     pbr_functions,
     pbr_functions::{apply_pbr_lighting, main_pass_post_lighting_processing},
     pbr_types,
+    view_transformations::position_world_to_clip,
 }
 
 struct PlanetSurfaceUniform {
@@ -38,10 +40,60 @@ struct PlanetSurfaceUniform {
     land_grass: vec4<f32>,
     land_rock: vec4<f32>,
     land_snow: vec4<f32>,
+    surface_detail_amp: f32,
+    surface_detail_scale: f32,
+    surface_morph: f32,
+    _pad_surface: vec3<f32>,
 };
 
 @group(3) @binding(31)
 var<uniform> material: PlanetSurfaceUniform;
+
+const SKIRT_FLAG_BIT: u32 = 0x8000u;
+const SKIRT_LAND_MASK_BITS: u32 = 0x7FFFu;
+const SKIRT_LAND_MASK_SCALE: f32 = 32767.0;
+
+@vertex
+fn vertex(vertex: Vertex) -> VertexOutput {
+    var out: VertexOutput;
+
+    let world_from_local = mesh_functions::get_world_from_local(vertex.instance_index);
+    let sphere_local = vec4<f32>(vertex.tangent.xyz, 1.0);
+    let displaced_local = vec4<f32>(vertex.position, 1.0);
+    let morph = clamp(material.surface_morph, 0.0, 1.0);
+    let local_position = mix(sphere_local, displaced_local, morph);
+
+    let world_position = mesh_functions::mesh_position_local_to_world(world_from_local, local_position);
+    out.world_position = world_position;
+    out.position = position_world_to_clip(world_position.xyz);
+
+    let sphere_normal = normalize(vertex.tangent.xyz);
+    let displaced_normal = vertex.normal;
+    let local_normal = normalize(mix(sphere_normal, displaced_normal, morph));
+    out.world_normal = mesh_functions::mesh_normal_local_to_world(local_normal, vertex.instance_index);
+
+#ifdef VERTEX_UVS_A
+    out.uv = vertex.uv;
+#endif
+#ifdef VERTEX_UVS_B
+    out.uv_b = vertex.uv_b;
+#endif
+#ifdef VERTEX_TANGENTS
+    out.world_tangent = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+#endif
+#ifdef VERTEX_COLORS
+    out.color = vertex.color;
+#endif
+#ifdef VERTEX_OUTPUT_INSTANCE_INDEX
+    out.instance_index = vertex.instance_index;
+#endif
+#ifdef VISIBILITY_RANGE_DITHER
+    out.visibility_range_dither =
+        mesh_functions::get_visibility_range_dither_level(vertex.instance_index, world_position);
+#endif
+
+    return out;
+}
 
 fn smooth3(t: f32) -> f32 {
     return t * t * (3.0 - 2.0 * t);
@@ -457,9 +509,19 @@ fn fragment(vertex_output: VertexOutput, @builtin(front_facing) is_front: bool) 
     pbr_functions::visibility_range_dither(vertex_output.position, vertex_output.visibility_range_dither);
 #endif
 
-    var pbr_input = pbr_input_from_vertex_output(vertex_output, is_front, false);
-    pbr_input.material.base_color = vec4(1.0, 1.0, 1.0, 1.0);
-    pbr_input.material.flags = pbr_types::STANDARD_MATERIAL_FLAGS_ALPHA_MODE_OPAQUE;
+    var pbr_input = pbr_input_from_standard_material(vertex_output, is_front);
+
+    let sampled_base_color = pbr_input.material.base_color;
+    let sampled_perceptual_roughness = pbr_input.material.perceptual_roughness;
+    let sampled_reflectance = pbr_input.material.reflectance;
+    let sampled_metallic = pbr_input.material.metallic;
+    let sampled_flags = pbr_input.material.flags;
+    let sampled_normal = pbr_input.N;
+
+    let has_base_color_texture =
+        (sampled_flags & pbr_types::STANDARD_MATERIAL_FLAGS_BASE_COLOR_TEXTURE_BIT) != 0u;
+    let has_metallic_roughness_texture =
+        (sampled_flags & pbr_types::STANDARD_MATERIAL_FLAGS_METALLIC_ROUGHNESS_TEXTURE_BIT) != 0u;
 
     let unit = decode_unit_octa(vertex_output.uv);
 
@@ -484,7 +546,11 @@ fn fragment(vertex_output: VertexOutput, @builtin(front_facing) is_front: bool) 
     let pack_ht = decode_pair(vertex_output.color.x);
     let pack_sl = decode_pair(vertex_output.color.y);
     let pack_mr = decode_pair(vertex_output.color.z);
-    let pack_lv = decode_pair(vertex_output.color.w);
+    let pack_lv_bits = bitcast<u32>(vertex_output.color.w);
+    let depth_bits = pack_lv_bits >> 16u;
+    let land_bits_raw = pack_lv_bits & 0xFFFFu;
+    let is_skirt = (land_bits_raw & SKIRT_FLAG_BIT) != 0u;
+    let land_bits = land_bits_raw & SKIRT_LAND_MASK_BITS;
 
     let moisture = clamp(pack_md.x, 0.0, 1.0);
     let dryness = clamp(pack_md.y, 0.0, 1.0);
@@ -496,8 +562,12 @@ fn fragment(vertex_output: VertexOutput, @builtin(front_facing) is_front: bool) 
     let continent_value = clamp(pack_sl.y, 0.0, 1.0) * 2.0 - 1.0;
     let mountain_mask = clamp(pack_mr.x, 0.0, 1.0);
     let ridge_light = clamp(pack_mr.y, 0.0, 1.0);
-    let depth_or_valley = clamp(pack_lv.x, 0.0, 1.0);
-    let land_mask = clamp(pack_lv.y, 0.0, 1.0);
+    let depth_or_valley = clamp(f32(depth_bits) / 65535.0, 0.0, 1.0);
+    let land_mask = clamp(f32(land_bits) / SKIRT_LAND_MASK_SCALE, 0.0, 1.0);
+    var skirt_factor = 0.0;
+    if (is_skirt) {
+        skirt_factor = 1.0;
+    }
     let lat_abs = abs(unit.y);
 
     let warp_field = fbm3_with_derivative(
@@ -613,8 +683,10 @@ fn fragment(vertex_output: VertexOutput, @builtin(front_facing) is_front: bool) 
         let shelf_mix = smoothstep(0.0, 0.5, depth);
         let water_color = mix(shallow_color, deep_color, shelf_mix);
         albedo = clamp(water_color * 0.64 + ambient_tint * 0.06, vec3(0.0), vec3(1.0));
-        pbr_input.material.perceptual_roughness = 0.22;
-        pbr_input.material.reflectance = vec3(0.08);
+        if (!has_metallic_roughness_texture) {
+            pbr_input.material.perceptual_roughness = 0.22;
+            pbr_input.material.reflectance = vec3(0.08);
+        }
     } else {
         var color = biome_color(temperature, moisture);
 
@@ -646,6 +718,21 @@ fn fragment(vertex_output: VertexOutput, @builtin(front_facing) is_front: bool) 
         color = mix(coast_color, color, clamp(coast_soft * 0.55, 0.0, 1.0));
         color = clamp(color + vec3(micro) * 0.032, vec3(0.0), vec3(1.0));
 
+        let detail_amp = material.surface_detail_amp;
+        if detail_amp > 1e-4 {
+            let detail_scale = max(material.surface_detail_scale, 0.01);
+            let surface_detail = fbm3_with_derivative(
+                material.seed ^ 0xF5u,
+                unit.x * detail_scale,
+                unit.y * detail_scale,
+                unit.z * detail_scale,
+                detail_scale,
+            );
+            let detail_value = surface_detail.value * 2.0 - 1.0;
+            color = clamp(color + vec3(detail_value) * (detail_amp * 0.38), vec3(0.0), vec3(1.0));
+            normal = normalize(normal + surface_detail.grad * (detail_amp * 0.32));
+        }
+
         let cloud_seed = smoothstep(0.65, 1.0, snow_score) * 0.6
             + smoothstep(0.58, 0.92, moisture) * (1.0 - dryness) * 0.4;
         let cloud_intensity = clamp(cloud_seed, 0.0, 1.0);
@@ -672,18 +759,58 @@ fn fragment(vertex_output: VertexOutput, @builtin(front_facing) is_front: bool) 
             color + ambient_tint * (ambient_blend * night_mix + rim * 0.25 * (1.0 - coast_soft));
         color = clamp(color, vec3(0.0), vec3(1.0));
         albedo = clamp(color, vec3(0.0), vec3(1.0));
-        var roughness = pbr_input.material.perceptual_roughness;
-        roughness = roughness + (0.38 - roughness) * (mountain_highlight * 0.6);
-        pbr_input.material.perceptual_roughness = clamp(roughness, 0.0, 1.0);
+        if (!has_metallic_roughness_texture) {
+            var roughness = pbr_input.material.perceptual_roughness;
+            roughness = roughness + (0.38 - roughness) * (mountain_highlight * 0.6);
+            pbr_input.material.perceptual_roughness = clamp(roughness, 0.0, 1.0);
 
-        var reflectance = pbr_input.material.reflectance;
-        reflectance = reflectance + (vec3(0.06) - reflectance) * (mountain_highlight * 0.5);
-        pbr_input.material.reflectance = clamp(reflectance, vec3(0.0), vec3(1.0));
+            var reflectance = pbr_input.material.reflectance;
+            reflectance =
+                reflectance + (vec3(0.06) - reflectance) * (mountain_highlight * 0.5);
+            pbr_input.material.reflectance = clamp(reflectance, vec3(0.0), vec3(1.0));
+        }
     }
 
-    pbr_input.material.base_color = vec4(albedo, 1.0);
-    pbr_input.N = normal;
-    pbr_input.world_normal = normal;
+    var final_color = albedo;
+    if (has_base_color_texture) {
+        final_color = clamp(sampled_base_color.rgb, vec3(0.0), vec3(1.0));
+    }
+
+    let limb_weight = clamp(rim * 0.85 + 0.1, 0.0, 1.0);
+    let normal_mix = min(1.0, skirt_factor * (0.82 + limb_weight * 0.18));
+    normal = normalize(mix(normal, unit, normal_mix));
+    if (skirt_factor > 0.0) {
+        let skirt_mix = clamp(skirt_factor * (0.55 + rim * 0.45), 0.0, 1.0);
+        let base_surface = mix(material.water_shallow.xyz, material.land_grass.xyz, land_mask);
+        let coastal_surface =
+            mix(material.land_sand.xyz, base_surface, clamp(land_mask + shore_mix * 0.5, 0.0, 1.0));
+        let tonal_target = mix(coastal_surface, ambient_tint, 0.42);
+        final_color = mix(final_color, tonal_target, skirt_mix);
+        if (!has_metallic_roughness_texture) {
+            pbr_input.material.perceptual_roughness =
+                mix(pbr_input.material.perceptual_roughness, mix(0.88, 0.97, rim), skirt_mix);
+            pbr_input.material.reflectance =
+                mix(pbr_input.material.reflectance, vec3(0.015), skirt_mix);
+            pbr_input.material.metallic = mix(pbr_input.material.metallic, 0.0, skirt_mix);
+        }
+        if (material.sun_dir.w > 0.5) {
+            final_color = mix(final_color, vec3(0.95, 0.28, 0.78), 0.8);
+        }
+    }
+
+    if (has_metallic_roughness_texture) {
+        pbr_input.material.perceptual_roughness = sampled_perceptual_roughness;
+        pbr_input.material.reflectance = sampled_reflectance;
+        pbr_input.material.metallic = sampled_metallic;
+    }
+
+    pbr_input.material.base_color = vec4(final_color, sampled_base_color.a);
+    var final_normal = normal;
+#ifdef STANDARD_MATERIAL_NORMAL_MAP
+    final_normal = normalize(mix(normal, sampled_normal, 0.7));
+#endif
+    pbr_input.N = final_normal;
+    pbr_input.world_normal = final_normal;
 
     var out: FragmentOutput;
     out.color = apply_pbr_lighting(pbr_input);
