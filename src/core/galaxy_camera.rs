@@ -1,3 +1,6 @@
+use crate::app::AppState;
+use crate::game::ui::pause_menu::pause_menu_hidden;
+use crate::game::ui::settings_menu::settings_menu_hidden;
 use crate::MessageReader;
 use bevy::input::mouse::{MouseMotion, MouseScrollUnit, MouseWheel};
 use bevy::prelude::*;
@@ -77,7 +80,13 @@ impl GalaxyCamera {
 pub struct GalaxyCameraPlugin;
 impl Plugin for GalaxyCameraPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, camera_controller_system);
+        app.add_systems(
+            Update,
+            camera_controller_system
+                .run_if(in_state(AppState::InGame))
+                .run_if(pause_menu_hidden)
+                .run_if(settings_menu_hidden),
+        );
     }
 }
 

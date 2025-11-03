@@ -1,3 +1,6 @@
+use crate::app::AppState;
+use crate::game::ui::pause_menu::pause_menu_hidden;
+use crate::game::ui::settings_menu::settings_menu_hidden;
 use crate::game::world::planet::{PlanetDebugConfig, PlanetDebugMode, PlanetParams, PlanetTag};
 use bevy::math::Isometry3d;
 use bevy::prelude::*;
@@ -16,7 +19,13 @@ impl Plugin for PlanetDebugPlugin {
                 // scale multipliers relative to the planet radius (1.0 = surface)
                 radii: vec![1.20, 1.68, 3.60, 5.40],
             })
-            .add_systems(Update, (draw_lod_bands, cycle_debug_mode));
+            .add_systems(
+                Update,
+                (draw_lod_bands, cycle_debug_mode)
+                    .run_if(in_state(AppState::InGame))
+                    .run_if(pause_menu_hidden)
+                    .run_if(settings_menu_hidden),
+            );
     }
 }
 

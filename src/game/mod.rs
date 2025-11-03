@@ -16,6 +16,7 @@ use crate::game::planet_surface::{
     stream::{drain_requests_system, PatchLoadTasks, PatchRequestQueue},
 };
 use crate::game::world::planet::{
+<<<<<<< HEAD
     spawn_random_planet_inner, spin_planet_clouds, sync_orbit_shell_visibility,
     sync_planet_material_uniforms, toggle_planet_wireframe, update_planet_lod, AtmosphereMaterial,
     PlanetDebugConfig, PlanetEntity, PlanetParams, PlanetSettings, PlanetSurfaceMaterial,
@@ -23,6 +24,16 @@ use crate::game::world::planet::{
 use crate::game::world::sampling::FlatSamplerRes;
 use crate::game::world::terrain::MapSettings;
 use bevy::ecs::schedule::IntoScheduleConfigs;
+=======
+    spawn_random_planet_inner, spin_planet_clouds, sync_planet_material_uniforms,
+    toggle_planet_wireframe, update_planet_lod, AtmosphereMaterial, PlanetDebugConfig,
+    PlanetEntity, PlanetParams, PlanetSettings, PlanetSurfaceMaterial, PlanetTag,
+};
+use crate::game::world::sampling::FlatSamplerRes;
+use crate::game::world::terrain::MapSettings;
+use crate::game::ui::pause_menu::pause_menu_hidden;
+use crate::game::ui::settings_menu::settings_menu_hidden;
+>>>>>>> fc79194b0c1d31000811f9fa04b7430d288e7ecf
 use bevy::{
     camera::visibility::NoFrustumCulling,
     math::{primitives::Sphere, EulerRot, Quat, Vec3, Vec4},
@@ -32,7 +43,6 @@ use bevy::{
         render_resource::AsBindGroup, renderer::RenderDevice, Render, RenderApp, RenderSystems,
     },
 };
-
 pub mod planet_surface;
 pub mod ui;
 pub mod world;
@@ -123,8 +133,11 @@ impl Plugin for GamePlugin {
             .add_plugins(GalaxyCameraPlugin)
             .add_plugins(SkyboxPlugin)
             .add_plugins(ui::dev_panel::DevPanelPlugin)
+            .add_plugins(ui::pause_menu::PauseMenuPlugin)
+            .add_plugins(ui::settings_menu::SettingsMenuPlugin)
             .add_systems(
                 Update,
+<<<<<<< HEAD
                 update_sun_direction_from_transform.run_if(in_state(AppState::InGame)),
             )
             .add_systems(Update, update_planet_lod.run_if(in_state(AppState::InGame)))
@@ -180,8 +193,29 @@ impl Plugin for GamePlugin {
             .add_systems(
                 Update,
                 update_patch_stats.run_if(in_state(AppState::InGame)),
+=======
+                (
+                    update_sun_direction_from_transform,
+                    update_planet_lod,
+                    update_planet_context,
+                    drain_requests_system,
+                    process_patch_queue,
+                    prune_surface_patches,
+                    sync_planet_material_uniforms,
+                    toggle_planet_wireframe,
+                    sync_sun_with_planet_rotation,
+                    apply_sun_settings,
+                    enforce_sun_visibility,
+                    spin_planet_clouds,
+                    update_patch_stats,
+                )
+                    .run_if(in_state(AppState::InGame))
+                    .run_if(pause_menu_hidden)
+                    .run_if(settings_menu_hidden),
+>>>>>>> fc79194b0c1d31000811f9fa04b7430d288e7ecf
             )
-            .add_systems(OnEnter(AppState::InGame), setup_world);
+            .add_systems(OnEnter(AppState::InGame), setup_world)
+            .add_systems(OnExit(AppState::InGame), cleanup_ingame_world);
 
         if let Some(render_app) = app.get_sub_app_mut(RenderApp) {
             render_app.add_systems(
@@ -392,6 +426,39 @@ fn setup_world(
         Transform::from_xyz(0.0, params.radius + 60.0, 0.0),
         Name::new("DebugSphere"),
     ));
+}
+
+fn cleanup_ingame_world(
+    mut commands: Commands,
+    cameras: Query<Entity, With<MainCamera>>,
+    suns: Query<Entity, With<SunLight>>,
+    planets: Query<Entity, With<PlanetTag>>,
+    mut planet_entity: ResMut<PlanetEntity>,
+    children: Query<&Children>,
+) {
+    for entity in &cameras {
+        despawn_entity_recursive(&mut commands, entity, &children);
+    }
+    for entity in &suns {
+        despawn_entity_recursive(&mut commands, entity, &children);
+    }
+    for entity in &planets {
+        despawn_entity_recursive(&mut commands, entity, &children);
+    }
+    planet_entity.0 = None;
+}
+
+fn despawn_entity_recursive(
+    commands: &mut Commands,
+    entity: Entity,
+    children_q: &Query<&Children>,
+) {
+    if let Ok(children) = children_q.get(entity) {
+        for child in children.iter() {
+            despawn_entity_recursive(commands, child, children_q);
+        }
+    }
+    commands.entity(entity).despawn();
 }
 
 fn sync_sun_with_planet_rotation(
