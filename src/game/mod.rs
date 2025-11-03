@@ -15,25 +15,17 @@ use crate::game::planet_surface::{
     },
     stream::{drain_requests_system, PatchLoadTasks, PatchRequestQueue},
 };
+use crate::game::ui::pause_menu::pause_menu_hidden;
+use crate::game::ui::settings_menu::settings_menu_hidden;
 use crate::game::world::planet::{
-<<<<<<< HEAD
     spawn_random_planet_inner, spin_planet_clouds, sync_orbit_shell_visibility,
     sync_planet_material_uniforms, toggle_planet_wireframe, update_planet_lod, AtmosphereMaterial,
     PlanetDebugConfig, PlanetEntity, PlanetParams, PlanetSettings, PlanetSurfaceMaterial,
+    PlanetTag,
 };
 use crate::game::world::sampling::FlatSamplerRes;
 use crate::game::world::terrain::MapSettings;
 use bevy::ecs::schedule::IntoScheduleConfigs;
-=======
-    spawn_random_planet_inner, spin_planet_clouds, sync_planet_material_uniforms,
-    toggle_planet_wireframe, update_planet_lod, AtmosphereMaterial, PlanetDebugConfig,
-    PlanetEntity, PlanetParams, PlanetSettings, PlanetSurfaceMaterial, PlanetTag,
-};
-use crate::game::world::sampling::FlatSamplerRes;
-use crate::game::world::terrain::MapSettings;
-use crate::game::ui::pause_menu::pause_menu_hidden;
-use crate::game::ui::settings_menu::settings_menu_hidden;
->>>>>>> fc79194b0c1d31000811f9fa04b7430d288e7ecf
 use bevy::{
     camera::visibility::NoFrustumCulling,
     math::{primitives::Sphere, EulerRot, Quat, Vec3, Vec4},
@@ -137,69 +129,15 @@ impl Plugin for GamePlugin {
             .add_plugins(ui::settings_menu::SettingsMenuPlugin)
             .add_systems(
                 Update,
-<<<<<<< HEAD
-                update_sun_direction_from_transform.run_if(in_state(AppState::InGame)),
-            )
-            .add_systems(Update, update_planet_lod.run_if(in_state(AppState::InGame)))
-            .add_systems(
-                Update,
-                update_planet_context.run_if(in_state(AppState::InGame)),
-            )
-            .add_systems(
-                Update,
-                sync_orbit_shell_visibility.run_if(in_state(AppState::InGame)),
-            )
-            .add_systems(
-                Update,
-                drain_requests_system.run_if(in_state(AppState::InGame)),
-            )
-            .add_systems(Update, process_patch_queue)
-            .add_systems(
-                Update,
-                attach_prop_gizmos.run_if(in_state(AppState::InGame)),
-            )
-            .add_systems(
-                Update,
-                climate_profiler_finish_frame.run_if(in_state(AppState::InGame)),
-            )
-            .add_systems(
-                Update,
-                prune_surface_patches.run_if(in_state(AppState::InGame)),
-            )
-            .add_systems(
-                Update,
-                sync_planet_material_uniforms.run_if(in_state(AppState::InGame)),
-            )
-            .add_systems(
-                Update,
-                toggle_planet_wireframe.run_if(in_state(AppState::InGame)),
-            )
-            .add_systems(
-                Update,
-                sync_sun_with_planet_rotation.run_if(in_state(AppState::InGame)),
-            )
-            .add_systems(
-                Update,
-                apply_sun_settings.run_if(in_state(AppState::InGame)),
-            )
-            .add_systems(
-                Update,
-                enforce_sun_visibility.run_if(in_state(AppState::InGame)),
-            )
-            .add_systems(
-                Update,
-                spin_planet_clouds.run_if(in_state(AppState::InGame)),
-            )
-            .add_systems(
-                Update,
-                update_patch_stats.run_if(in_state(AppState::InGame)),
-=======
                 (
                     update_sun_direction_from_transform,
                     update_planet_lod,
                     update_planet_context,
+                    sync_orbit_shell_visibility,
                     drain_requests_system,
                     process_patch_queue,
+                    attach_prop_gizmos,
+                    climate_profiler_finish_frame,
                     prune_surface_patches,
                     sync_planet_material_uniforms,
                     toggle_planet_wireframe,
@@ -212,7 +150,6 @@ impl Plugin for GamePlugin {
                     .run_if(in_state(AppState::InGame))
                     .run_if(pause_menu_hidden)
                     .run_if(settings_menu_hidden),
->>>>>>> fc79194b0c1d31000811f9fa04b7430d288e7ecf
             )
             .add_systems(OnEnter(AppState::InGame), setup_world)
             .add_systems(OnExit(AppState::InGame), cleanup_ingame_world);

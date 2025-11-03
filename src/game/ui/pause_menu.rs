@@ -44,7 +44,11 @@ impl Plugin for PauseMenuPlugin {
             .add_systems(OnExit(AppState::InGame), cleanup_pause_menu)
             .add_systems(
                 Update,
-                (toggle_pause_menu, pause_menu_button_logic, handle_pause_menu_commands)
+                (
+                    toggle_pause_menu,
+                    pause_menu_button_logic,
+                    handle_pause_menu_commands,
+                )
                     .run_if(in_state(AppState::InGame)),
             );
     }
@@ -311,11 +315,7 @@ fn set_menu_visibility(
     }
 }
 
-fn despawn_recursive(
-    commands: &mut Commands,
-    entity: Entity,
-    children_q: &Query<&Children>,
-) {
+fn despawn_recursive(commands: &mut Commands, entity: Entity, children_q: &Query<&Children>) {
     if let Ok(children) = children_q.get(entity) {
         for child in children.iter() {
             despawn_recursive(commands, child, children_q);

@@ -227,7 +227,9 @@ fn spawn_settings_menu(mut commands: Commands, assets: Res<AssetServer>) {
                     .with_children(|content| {
                         content.spawn((
                             SettingsContentText,
-                            Text::new("Adjust visual quality, resolution, and rendering features here."),
+                            Text::new(
+                                "Adjust visual quality, resolution, and rendering features here.",
+                            ),
                             TextFont {
                                 font: font.clone(),
                                 font_size: 18.0,
@@ -257,43 +259,44 @@ fn spawn_settings_menu(mut commands: Commands, assets: Res<AssetServer>) {
                         ));
                     });
 
-                panel.spawn((
-                    Node {
-                        flex_direction: FlexDirection::Row,
-                        justify_content: JustifyContent::FlexEnd,
-                        ..default()
-                    },
-                    Name::new("SettingsFooter"),
-                ))
-                .with_children(|footer| {
-                    footer
-                        .spawn((
-                            CloseSettingsButton,
-                            Button,
-                            Node {
-                                padding: UiRect::new(
-                                    Val::Px(18.0),
-                                    Val::Px(18.0),
-                                    Val::Px(10.0),
-                                    Val::Px(10.0),
-                                ),
-                                ..default()
-                            },
-                            BackgroundColor(Color::srgb(0.95, 0.82, 0.10)),
-                            BorderColor::all(Color::srgb(0.05, 0.05, 0.05)),
-                        ))
-                        .with_children(|button| {
-                            button.spawn((
-                                Text::new("Back"),
-                                TextFont {
-                                    font,
-                                    font_size: 20.0,
+                panel
+                    .spawn((
+                        Node {
+                            flex_direction: FlexDirection::Row,
+                            justify_content: JustifyContent::FlexEnd,
+                            ..default()
+                        },
+                        Name::new("SettingsFooter"),
+                    ))
+                    .with_children(|footer| {
+                        footer
+                            .spawn((
+                                CloseSettingsButton,
+                                Button,
+                                Node {
+                                    padding: UiRect::new(
+                                        Val::Px(18.0),
+                                        Val::Px(18.0),
+                                        Val::Px(10.0),
+                                        Val::Px(10.0),
+                                    ),
                                     ..default()
                                 },
-                                TextColor(Color::srgb(0.08, 0.08, 0.1)),
-                            ));
-                        });
-                });
+                                BackgroundColor(Color::srgb(0.95, 0.82, 0.10)),
+                                BorderColor::all(Color::srgb(0.05, 0.05, 0.05)),
+                            ))
+                            .with_children(|button| {
+                                button.spawn((
+                                    Text::new("Back"),
+                                    TextFont {
+                                        font,
+                                        font_size: 20.0,
+                                        ..default()
+                                    },
+                                    TextColor(Color::srgb(0.08, 0.08, 0.1)),
+                                ));
+                            });
+                    });
             });
         });
 }
@@ -410,9 +413,16 @@ fn update_tab_visuals(
 
     if let Some(mut text) = text_sets.p0().iter_mut().next() {
         text.0 = match state.active_tab {
-            SettingsTab::Graphics => "Adjust visual quality, resolution, and rendering features here.".to_string(),
-            SettingsTab::Controls => "Configure key bindings, mouse sensitivity, and accessibility shortcuts here.".to_string(),
-            SettingsTab::Sound => "Set master volume, music balance, and sound effect levels here.".to_string(),
+            SettingsTab::Graphics => {
+                "Adjust visual quality, resolution, and rendering features here.".to_string()
+            }
+            SettingsTab::Controls => {
+                "Configure key bindings, mouse sensitivity, and accessibility shortcuts here."
+                    .to_string()
+            }
+            SettingsTab::Sound => {
+                "Set master volume, music balance, and sound effect levels here.".to_string()
+            }
         };
     }
 
@@ -451,11 +461,7 @@ fn set_settings_menu_visibility(
     }
 }
 
-fn despawn_recursive(
-    commands: &mut Commands,
-    entity: Entity,
-    children_q: &Query<&Children>,
-) {
+fn despawn_recursive(commands: &mut Commands, entity: Entity, children_q: &Query<&Children>) {
     if let Ok(children) = children_q.get(entity) {
         for child in children.iter() {
             despawn_recursive(commands, child, children_q);

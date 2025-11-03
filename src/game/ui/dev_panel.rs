@@ -17,6 +17,8 @@ use crate::game::planet_surface::{
     procedural_loader::ClimateProfiler,
     render::{PatchCacheMetrics, PatchStats},
 };
+use crate::game::ui::pause_menu::pause_menu_hidden;
+use crate::game::ui::settings_menu::settings_menu_hidden;
 use crate::game::world::planet::{
     analyze_planet_climate, apply_guardrail_adjustment, guardrail_adjustment_from_summaries,
     guardrail_adjustment_from_summary, log_planet_configuration, spawn_random_planet_inner,
@@ -26,8 +28,6 @@ use crate::game::world::planet::{
 use crate::game::world::sampling::FlatSamplerRes;
 use crate::game::world::terrain::{MapRoot, MapSettings};
 use crate::game::{SunDirection, SunSettings};
-use crate::game::ui::pause_menu::pause_menu_hidden;
-use crate::game::ui::settings_menu::settings_menu_hidden;
 
 pub struct DevPanelPlugin;
 
@@ -40,13 +40,9 @@ pub enum DevPanelCommand {
 
 impl Plugin for DevPanelPlugin {
     fn build(&self, app: &mut App) {
-<<<<<<< HEAD
-        app.init_resource::<DevPanelState>()
-            .init_resource::<DevPanelScrollState>()
-=======
         app.add_message::<DevPanelCommand>()
             .init_resource::<DevPanelState>()
->>>>>>> fc79194b0c1d31000811f9fa04b7430d288e7ecf
+            .init_resource::<DevPanelScrollState>()
             .init_resource::<PlanetSettings>()
             .add_systems(
                 OnEnter(AppState::InGame),
@@ -81,22 +77,14 @@ impl Plugin for DevPanelPlugin {
         );
         app.add_systems(
             Update,
-<<<<<<< HEAD
-            handle_dev_panel_scroll.run_if(in_state(AppState::InGame)),
-        );
-        app.add_systems(
-            Update,
-            (update_planet_detail_frequency, sync_lod_settings_from_panel)
-                .run_if(in_state(AppState::InGame)),
-=======
             (
+                handle_dev_panel_scroll,
                 update_planet_detail_frequency,
                 sync_lod_settings_from_panel,
             )
                 .run_if(in_state(AppState::InGame))
                 .run_if(pause_menu_hidden)
                 .run_if(settings_menu_hidden),
->>>>>>> fc79194b0c1d31000811f9fa04b7430d288e7ecf
         );
     }
 }
@@ -936,33 +924,56 @@ fn toggle_panel_visibility(
     mut content_q: Query<&mut Transform, With<DevPanelScrollContent>>,
 ) {
     if keys.just_pressed(KeyCode::F1) {
-<<<<<<< HEAD
-        state.open = !state.open;
-        state.active_input = None;
-        state.active_slider = None;
-
-        if let Ok(mut node) = query.single_mut() {
-            node.display = if state.open {
-                Display::Flex
-            } else {
-                Display::None
-            };
-            if state.open {
-                scroll_state.offset = 0.0;
-                if let Ok(mut transform) = content_q.single_mut() {
-                    transform.translation.y = 0.0;
-                }
-            }
-=======
         if let Some(mut node) = query.iter_mut().next() {
             let open = !state.open;
             apply_panel_visibility(&mut state, &mut node, open);
->>>>>>> fc79194b0c1d31000811f9fa04b7430d288e7ecf
+            if open {
+                reset_panel_scroll(&mut scroll_state, &mut content_q);
+            }
         }
     }
 }
 
-<<<<<<< HEAD
+fn handle_panel_commands(
+    mut events: MessageReader<DevPanelCommand>,
+    mut state: ResMut<DevPanelState>,
+    mut query: Query<&mut Node, With<DevPanelRoot>>,
+    mut scroll_state: ResMut<DevPanelScrollState>,
+    mut content_q: Query<&mut Transform, With<DevPanelScrollContent>>,
+) {
+    let state_ref = &mut *state;
+    for command in events.read() {
+        if let Some(mut node) = query.iter_mut().next() {
+            let open = match command {
+                DevPanelCommand::Show => true,
+                DevPanelCommand::Hide => false,
+                DevPanelCommand::Toggle => !state_ref.open,
+            };
+            apply_panel_visibility(state_ref, &mut node, open);
+            if open {
+                reset_panel_scroll(&mut scroll_state, &mut content_q);
+            }
+        }
+    }
+}
+
+fn apply_panel_visibility(state: &mut DevPanelState, node: &mut Node, open: bool) {
+    state.open = open;
+    state.active_input = None;
+    state.active_slider = None;
+    node.display = if open { Display::Flex } else { Display::None };
+}
+
+fn reset_panel_scroll(
+    scroll_state: &mut DevPanelScrollState,
+    content_q: &mut Query<&mut Transform, With<DevPanelScrollContent>>,
+) {
+    scroll_state.offset = 0.0;
+    if let Ok(mut transform) = content_q.single_mut() {
+        transform.translation.y = 0.0;
+    }
+}
+
 fn sparkline(values: &[f32]) -> String {
     if values.is_empty() {
         return "-".to_string();
@@ -1010,37 +1021,6 @@ fn sparkline_from_u32(data: &VecDeque<u32>) -> String {
     let start = data.len().saturating_sub(HISTORY_LEN);
     let slice: Vec<f32> = data.iter().skip(start).map(|&value| value as f32).collect();
     sparkline(&slice)
-=======
-fn handle_panel_commands(
-    mut events: MessageReader<DevPanelCommand>,
-    mut state: ResMut<DevPanelState>,
-    mut query: Query<&mut Node, With<DevPanelRoot>>,
-) {
-    let state_ref = &mut *state;
-    for command in events.read() {
-        if let Some(mut node) = query.iter_mut().next() {
-            match command {
-                DevPanelCommand::Show => apply_panel_visibility(state_ref, &mut node, true),
-                DevPanelCommand::Hide => apply_panel_visibility(state_ref, &mut node, false),
-                DevPanelCommand::Toggle => {
-                    let next = !state_ref.open;
-                    apply_panel_visibility(state_ref, &mut node, next);
-                }
-            }
-        }
-    }
-}
-
-fn apply_panel_visibility(state: &mut DevPanelState, node: &mut Node, open: bool) {
-    state.open = open;
-    state.active_input = None;
-    state.active_slider = None;
-    node.display = if open {
-        Display::Flex
-    } else {
-        Display::None
-    };
->>>>>>> fc79194b0c1d31000811f9fa04b7430d288e7ecf
 }
 
 fn update_fps_display(
