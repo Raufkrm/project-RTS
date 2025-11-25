@@ -2,14 +2,25 @@
 use crate::app::AppState;
 use crate::core::galaxy_camera::{GalaxyCamera, GalaxyCameraPlugin, MainCamera};
 use crate::core::planet_debug::PlanetDebugPlugin;
+use crate::core::surface_model::PlanetSurfaceModel;
 use crate::core::skybox::{Skybox, SkyboxPlugin, StarfieldAssets};
+use crate::game::commands::{
+    debug_pick_surface_coord, init_surface_pick_res, LastSurfacePick,
+};
+use crate::game::planet_surface::virtual_texture::{PlanetPatchCache, PlanetPatchManifest};
+use crate::game::units::{update_ground_anchors_system, update_unit_movement_system};
 use crate::game::world::planet::{
     spawn_random_planet_inner, spin_planet_clouds, sync_planet_material_uniforms,
     toggle_planet_wireframe, update_planet_lod, AtmosphereMaterial, PlanetDebugConfig,
-    PlanetParams, PlanetSettings, PlanetSurfaceMaterial,
+    PlanetParams, PlanetSettings, PlanetSurfaceMaterial, DEFAULT_BIOME_MAP_RESOLUTION,
 };
 use crate::game::world::sampling::FlatSamplerRes;
+use crate::game::world::local_patch::{update_local_surface_patch_system, LocalSurfacePatch};
+use crate::game::world::surface_grid::SurfaceGrid;
 use crate::game::world::terrain::MapSettings;
+use bevy::asset::AssetServer;
+use bevy::ecs::system::SystemParam;
+use bevy::log::{info, warn};
 use bevy::{
     camera::visibility::NoFrustumCulling,
     math::{primitives::Sphere, EulerRot, Quat, Vec3, Vec4},
@@ -19,9 +30,16 @@ use bevy::{
         render_resource::AsBindGroup, renderer::RenderDevice, Render, RenderApp, RenderSystems,
     },
 };
+use std::marker::PhantomData;
 
+pub mod commands;
+pub mod planet_surface;
 pub mod ui;
+pub mod units;
 pub mod world;
+
+#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+pub struct InGameSystemSet;
 
 #[derive(Component)]
 pub struct InGameRoot;
@@ -90,6 +108,10 @@ impl Plugin for GamePlugin {
             .init_resource::<PlanetDebugConfig>()
             .init_resource::<SunSettings>()
             .init_resource::<SunDirection>()
+            .init_resource::<PlanetSurfaceModel>()
+            .init_resource::<SurfaceGrid>()
+            .init_resource::<LocalSurfacePatch>()
+            .init_resource::<LastSurfacePick>()
             .add_plugins(MaterialPlugin::<PlanetSurfaceMaterial>::default())
             .add_plugins(MaterialPlugin::<AtmosphereMaterial>::default())
             .add_plugins(WireframePlugin::default())
@@ -97,21 +119,52 @@ impl Plugin for GamePlugin {
             .add_plugins(GalaxyCameraPlugin)
             .add_plugins(SkyboxPlugin)
             .add_plugins(ui::dev_panel::DevPanelPlugin)
+            .configure_sets(
+                Update,
+                InGameSystemSet.run_if(in_state(AppState::InGame)),
+            )
+            .add_systems(
+                Update,
+                update_sun_direction_from_transform.in_set(InGameSystemSet),
+            )
             .add_systems(
                 Update,
                 (
-                    update_sun_direction_from_transform,
-                    update_planet_lod,
-                    sync_planet_material_uniforms,
-                    toggle_planet_wireframe,
-                    sync_sun_with_planet_rotation,
-                    apply_sun_settings,
-                    enforce_sun_visibility,
-                    spin_planet_clouds,
+                    update_ground_anchors_system,
+                    update_unit_movement_system,
                 )
                     .run_if(in_state(AppState::InGame)),
             )
-            .add_systems(OnEnter(AppState::InGame), setup_world);
+            .add_systems(Update, update_planet_lod.in_set(InGameSystemSet))
+            .add_systems(
+                Update,
+                sync_planet_material_uniforms.in_set(InGameSystemSet),
+            )
+            .add_systems(Update, toggle_planet_wireframe.in_set(InGameSystemSet))
+            .add_systems(
+                Update,
+                sync_sun_with_planet_rotation.in_set(InGameSystemSet),
+            )
+            .add_systems(Update, apply_sun_settings.in_set(InGameSystemSet))
+            .add_systems(
+                Update,
+                enforce_sun_visibility.in_set(InGameSystemSet),
+            )
+            .add_systems(Update, spin_planet_clouds.in_set(InGameSystemSet))
+            .add_systems(
+                Update,
+                debug_pick_surface_coord.in_set(InGameSystemSet),
+            )
+            .add_systems(
+                Update,
+                update_local_surface_patch_system.run_if(in_state(AppState::InGame)),
+            )
+            .add_systems(Startup, init_surface_pick_res)
+            .add_systems(OnEnter(AppState::InGame), setup_world)
+            .add_systems(
+                OnEnter(AppState::InGame),
+                load_planet_patch_manifest,
+            );
 
         if let Some(render_app) = app.get_sub_app_mut(RenderApp) {
             render_app.add_systems(
@@ -142,12 +195,20 @@ fn inspect_planet_material_layout(render_device: Res<RenderDevice>, mut logged: 
     debug!("PlanetSurfaceMaterial bindings: {:?}", extended_entries);
 }
 
+#[derive(SystemParam)]
+struct SetupWorldAssets<'w, 's> {
+    meshes: ResMut<'w, Assets<Mesh>>,
+    planet_materials: ResMut<'w, Assets<PlanetSurfaceMaterial>>,
+    atmosphere_materials: ResMut<'w, Assets<AtmosphereMaterial>>,
+    standard_materials: ResMut<'w, Assets<StandardMaterial>>,
+    images: ResMut<'w, Assets<Image>>,
+    #[allow(dead_code)]
+    _marker: PhantomData<&'s ()>,
+}
+
 fn setup_world(
     mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut planet_materials: ResMut<Assets<PlanetSurfaceMaterial>>,
-    mut atmosphere_materials: ResMut<Assets<AtmosphereMaterial>>,
-    mut standard_materials: ResMut<Assets<StandardMaterial>>,
+    mut assets: SetupWorldAssets,
     mut sampler_res: ResMut<FlatSamplerRes>,
     map: Res<MapSettings>,
     params: Res<PlanetParams>,
@@ -168,8 +229,11 @@ fn setup_world(
     existing_skybox: Query<(), With<Skybox>>,
     sun_settings: Res<SunSettings>,
     mut sun_direction: ResMut<SunDirection>,
+    mut surface_model: ResMut<PlanetSurfaceModel>,
 ) {
     sampler_res.0.seed = map.seed;
+    surface_model.radius = params.radius;
+    surface_model.biome_resolution = DEFAULT_BIOME_MAP_RESOLUTION;
 
     let target_rotation = sun_rotation_from_params(params.rotation_deg);
 
@@ -191,16 +255,18 @@ fn setup_world(
 
     spawn_random_planet_inner(
         &mut commands,
-        &mut meshes,
-        &mut *planet_materials,
-        &mut *atmosphere_materials,
-        &mut *standard_materials,
+        &mut assets.meshes,
+        &mut *assets.planet_materials,
+        &mut *assets.atmosphere_materials,
+        &mut *assets.standard_materials,
+        &mut *assets.images,
         &*sampler_res,
         &map,
         &params,
         &settings,
         &debug,
         &*sun_direction,
+        &mut *surface_model,
     );
     info!("spawned planet with radius {}", params.radius);
 
@@ -232,8 +298,8 @@ fn setup_world(
         commands.entity(light_entity).insert(NoFrustumCulling);
     } else {
         let translation = sun_translation;
-        let mesh = meshes.add(Sphere::new(1.0));
-        let material = standard_materials.add(StandardMaterial {
+        let mesh = assets.meshes.add(Sphere::new(1.0));
+        let material = assets.standard_materials.add(StandardMaterial {
             base_color: sun_color,
             emissive: sun_emissive,
             unlit: true,
@@ -314,14 +380,30 @@ fn setup_world(
     }
 
     commands.spawn((
-        Mesh3d(meshes.add(Sphere::new(50.0))),
-        MeshMaterial3d(standard_materials.add(StandardMaterial {
+        Mesh3d(assets.meshes.add(Sphere::new(50.0))),
+        MeshMaterial3d(assets.standard_materials.add(StandardMaterial {
             base_color: Color::srgb(0.8, 0.2, 0.2),
             ..default()
         })),
         Transform::from_xyz(0.0, params.radius + 60.0, 0.0),
         Name::new("DebugSphere"),
     ));
+}
+
+fn load_planet_patch_manifest(mut commands: Commands, asset_server: Res<AssetServer>) {
+    match PlanetPatchManifest::scan("assets/planet_patches") {
+        Ok(manifest) => {
+            let mut cache = PlanetPatchCache::new(manifest);
+            cache.preload_face(0, &asset_server);
+            info!(
+                "planet patch manifest loaded (pages: {}, resident: {})",
+                cache.manifest().page_count(),
+                cache.resident_count()
+            );
+            commands.insert_resource(cache);
+        }
+        Err(err) => warn!("failed to scan planet patch assets: {err}"),
+    }
 }
 
 fn sync_sun_with_planet_rotation(
@@ -453,3 +535,4 @@ fn sun_rotation_from_params(rotation_deg: f32) -> Quat {
     let yaw = SUN_BASE_YAW + rotation_deg.to_radians();
     Quat::from_euler(EulerRot::XYZ, SUN_BASE_PITCH, yaw, 0.0)
 }
+

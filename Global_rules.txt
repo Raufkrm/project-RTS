@@ -1,0 +1,19 @@
+Global rules:
+
+You are editing an existing Rust + Bevy 0.18 project.
+
+Do not delete any public structs, enums, events, or resources.
+
+Do not rename existing types or change their public fields.
+
+Do not change shader paths, material types, or attribute layouts.
+
+Do not modify climate guardrail logic.
+
+Do not change LOD thresholds or the structure of update_planet_lod; you may only change where it reads biome/height data from.
+
+You may add new types, new functions, and new resources.
+
+You may move small helper functions into new modules, but keep the public API the same.
+
+If something looks unused, leave it; do not “clean up” by deleting code.

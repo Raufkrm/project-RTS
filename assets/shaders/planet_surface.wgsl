@@ -29,6 +29,7 @@ struct PlanetSurfaceUniform {
     perceptual_roughness: f32,
     metallic: f32,
     reflectance: f32,
+    sand_height: f32,
     rock_start: f32,
     snow_start: f32,
     sun_dir: vec4<f32>,
@@ -67,22 +68,6 @@ fn hash3(seed: u32, ix: i32, iy: i32, iz: i32) -> f32 {
     v *= 0x846CA68Bu;
     v ^= v >> 16u;
     return f32(v) / 4294967295.0;
-}
-
-fn decode_unit_octa(octa: vec2<f32>) -> vec3<f32> {
-    var normal = vec3<f32>(
-        octa.x * 2.0 - 1.0,
-        octa.y * 2.0 - 1.0,
-        1.0 - abs(octa.x * 2.0 - 1.0) - abs(octa.y * 2.0 - 1.0),
-    );
-    if normal.z < 0.0 {
-        let x = normal.x;
-        let y = normal.y;
-        normal.x = (1.0 - abs(y)) * sign(x);
-        normal.y = (1.0 - abs(x)) * sign(y);
-        normal.z = -normal.z;
-    }
-    return normalize(normal);
 }
 
 fn decode_pair(value: f32) -> vec2<f32> {
@@ -461,7 +446,10 @@ fn fragment(vertex_output: VertexOutput, @builtin(front_facing) is_front: bool) 
     pbr_input.material.base_color = vec4(1.0, 1.0, 1.0, 1.0);
     pbr_input.material.flags = pbr_types::STANDARD_MATERIAL_FLAGS_ALPHA_MODE_OPAQUE;
 
-    let unit = decode_unit_octa(vertex_output.uv);
+    let biome_hint = vertex_output.uv;
+    let biome_id_hint = clamp(biome_hint.x, 0.0, 1.0);
+    let altitude_hint = clamp(biome_hint.y, 0.0, 1.0);
+    let unit = normalize(vertex_output.world_position.xyz);
 
     if material.debug_mode != 0u {
         let debug_sample = climate_debug_evaluate(unit);
@@ -487,10 +475,13 @@ fn fragment(vertex_output: VertexOutput, @builtin(front_facing) is_front: bool) 
     let pack_lv = decode_pair(vertex_output.color.w);
 
     let moisture = clamp(pack_md.x, 0.0, 1.0);
-    let dryness = clamp(pack_md.y, 0.0, 1.0);
+    var dryness = clamp(pack_md.y + biome_id_hint * 1e-4, 0.0, 1.0);
     let coast_band = clamp(pack_cs.x, 0.0, 1.0);
     let snow_score = clamp(pack_cs.y, 0.0, 1.0);
-    let height01 = clamp(pack_ht.x, 0.0, 1.0);
+    let height_hint =
+        material.sea_level + altitude_hint * max(1.0 - material.sea_level, 1e-3);
+    var height01 = clamp(pack_ht.x, 0.0, 1.0);
+    height01 = mix(height_hint, height01, 0.999);
     let temperature = clamp(pack_ht.y, 0.0, 1.0);
     let slope = clamp(pack_sl.x, 0.0, 1.0);
     let continent_value = clamp(pack_sl.y, 0.0, 1.0) * 2.0 - 1.0;
@@ -577,7 +568,9 @@ fn fragment(vertex_output: VertexOutput, @builtin(front_facing) is_front: bool) 
         color = mix(color, vec3(0.92, 0.82, 0.6), desert_bleach * 0.35);
 
         let coast_soft = clamp(coast_band * 1.15, 0.0, 1.0);
-        let sand_mix = clamp(smoothstep(0.0, 0.25, elev01), 0.0, 1.0);
+        let sand_start = clamp(material.sand_height * 0.35, 0.0, material.sand_height);
+        let sand_end = max(material.sand_height, sand_start + 1e-3);
+        let sand_mix = clamp(smoothstep(sand_start, sand_end, elev01), 0.0, 1.0);
         let coast_color = mix(material.land_sand.xyz, color, sand_mix);
         color = mix(coast_color, color, clamp(coast_soft * 0.55, 0.0, 1.0));
         color = clamp(color + vec3(micro) * 0.025, vec3(0.0), vec3(1.0));
@@ -589,6 +582,8 @@ fn fragment(vertex_output: VertexOutput, @builtin(front_facing) is_front: bool) 
 
         let mountain_highlight = pow(mountain_mask, 1.4);
         color = mix(color, color + vec3(0.18), mountain_highlight * 0.35);
+        let snow_mix = smoothstep(material.snow_start - 0.04, material.snow_start + 0.06, elev01);
+        color = mix(color, material.land_snow.xyz, snow_mix);
 
         let shade_base = clamp(
             0.62 + hemi * 0.3 + sun_ndotl * 0.42 + ridge_light * 0.5

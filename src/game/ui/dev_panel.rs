@@ -1,24 +1,41 @@
 use std::fmt::Write as _;
 
+use bevy::ecs::system::SystemParam;
 use bevy::input::mouse::MouseButton;
 use bevy::log::{info, warn};
 use bevy::pbr::MeshMaterial3d;
 use bevy::prelude::*;
 use bevy::ui::RelativeCursorPosition;
+use std::marker::PhantomData;
 
 use crate::app::AppState;
-use crate::core::galaxy_camera::MainCamera;
+use crate::core::galaxy_camera::{GalaxyCamera, MainCamera};
+use crate::core::surface_model::PlanetSurfaceModel;
 use crate::game::world::planet::{
     analyze_planet_climate, apply_guardrail_adjustment, guardrail_adjustment_from_summaries,
     guardrail_adjustment_from_summary, log_planet_configuration, spawn_random_planet_inner,
     AtmosphereMaterial, GuardrailAdjustment, PlanetClimateSummary, PlanetDebugConfig, PlanetParams,
-    PlanetSettings, PlanetSurfaceMaterial, PlanetTag,
+    PlanetSettings, PlanetSurfaceMaterial, PlanetTag, DEFAULT_BIOME_MAP_RESOLUTION,
 };
 use crate::game::world::sampling::FlatSamplerRes;
 use crate::game::world::terrain::{MapRoot, MapSettings};
 use crate::game::{SunDirection, SunSettings};
 
 pub struct DevPanelPlugin;
+
+#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+struct DevPanelInGameSet;
+
+#[derive(SystemParam)]
+struct DevPanelAssets<'w, 's> {
+    meshes: ResMut<'w, Assets<Mesh>>,
+    planet_materials: ResMut<'w, Assets<PlanetSurfaceMaterial>>,
+    atmosphere_materials: ResMut<'w, Assets<AtmosphereMaterial>>,
+    standard_materials: ResMut<'w, Assets<StandardMaterial>>,
+    images: ResMut<'w, Assets<Image>>,
+    #[allow(dead_code)]
+    _marker: PhantomData<&'s ()>,
+}
 
 impl Plugin for DevPanelPlugin {
     fn build(&self, app: &mut App) {
@@ -29,29 +46,42 @@ impl Plugin for DevPanelPlugin {
                 (cleanup_panel, spawn_dev_panel).chain(),
             )
             .add_systems(OnExit(AppState::InGame), cleanup_panel)
+            .configure_sets(
+                Update,
+                DevPanelInGameSet.run_if(in_state(AppState::InGame)),
+            )
             .add_systems(
                 Update,
-                (
-                    toggle_panel_visibility,
-                    update_fps_display,
-                    handle_reroll_button,
-                    slider_input_system,
-                    numeric_input_interactions,
-                    numeric_input_editing,
-                    update_value_texts,
-                    update_slider_handles,
-                    update_input_highlights,
-                    apply_changes,
-                )
-                    .run_if(in_state(AppState::InGame)),
-            );
+                toggle_panel_visibility.in_set(DevPanelInGameSet),
+            )
+            .add_systems(Update, update_fps_display.in_set(DevPanelInGameSet))
+            .add_systems(
+                Update,
+                handle_reroll_button.in_set(DevPanelInGameSet),
+            )
+            .add_systems(Update, slider_input_system.in_set(DevPanelInGameSet))
+            .add_systems(
+                Update,
+                numeric_input_interactions.in_set(DevPanelInGameSet),
+            )
+            .add_systems(
+                Update,
+                numeric_input_editing.in_set(DevPanelInGameSet),
+            )
+            .add_systems(Update, update_value_texts.in_set(DevPanelInGameSet))
+            .add_systems(
+                Update,
+                update_slider_handles.in_set(DevPanelInGameSet),
+            )
+            .add_systems(
+                Update,
+                update_input_highlights.in_set(DevPanelInGameSet),
+            )
+            .add_systems(Update, apply_changes.in_set(DevPanelInGameSet));
+        app.add_systems(Update, handle_seed_sweep_button.in_set(DevPanelInGameSet));
         app.add_systems(
             Update,
-            handle_seed_sweep_button.run_if(in_state(AppState::InGame)),
-        );
-        app.add_systems(
-            Update,
-            update_planet_detail_frequency.run_if(in_state(AppState::InGame)),
+            update_planet_detail_frequency.in_set(DevPanelInGameSet),
         );
     }
 }
@@ -70,6 +100,9 @@ struct DevPanelState {
     warp_freq: f32,
     warp_amp: f32,
     mountain_strength: f32,
+    sand_height: f32,
+    rock_start: f32,
+    snow_start: f32,
     rotation_deg: f32,
     sun_brightness: f32,
     camera_altitude: f32,
@@ -94,6 +127,9 @@ impl Default for DevPanelState {
             warp_freq: 0.0,
             warp_amp: 0.0,
             mountain_strength: 0.0,
+            sand_height: 0.08,
+            rock_start: 0.54,
+            snow_start: 0.82,
             rotation_deg: 0.0,
             sun_brightness: 0.10,
             camera_altitude: 0.0,
@@ -127,6 +163,9 @@ enum ParameterKind {
     WarpFreq,
     WarpAmp,
     Mountains,
+    SandHeight,
+    RockHeight,
+    SnowHeight,
     Rotation,
     SunBrightness,
 }
@@ -182,7 +221,7 @@ impl ParameterDescriptor {
     }
 }
 
-const PARAM_DESCRIPTORS: [ParameterDescriptor; 10] = [
+const PARAM_DESCRIPTORS: [ParameterDescriptor; 13] = [
     ParameterDescriptor {
         kind: ParameterKind::WaterLevel,
         label: "Water Level",
@@ -243,6 +282,30 @@ const PARAM_DESCRIPTORS: [ParameterDescriptor; 10] = [
         kind: ParameterKind::Mountains,
         label: "Mountains",
         min: 0.0,
+        max: 1.0,
+        log_scale: false,
+        precision: 2,
+    },
+    ParameterDescriptor {
+        kind: ParameterKind::SandHeight,
+        label: "Sand Height",
+        min: 0.0,
+        max: 0.35,
+        log_scale: false,
+        precision: 2,
+    },
+    ParameterDescriptor {
+        kind: ParameterKind::RockHeight,
+        label: "Rock Height",
+        min: 0.1,
+        max: 0.95,
+        log_scale: false,
+        precision: 2,
+    },
+    ParameterDescriptor {
+        kind: ParameterKind::SnowHeight,
+        label: "Snow Height",
+        min: 0.2,
         max: 1.0,
         log_scale: false,
         precision: 2,
@@ -381,6 +444,9 @@ fn spawn_dev_panel(
     state.warp_freq = settings.warp_freq;
     state.warp_amp = settings.warp_amp;
     state.mountain_strength = settings.mountain_strength;
+    state.sand_height = settings.sand_height;
+    state.rock_start = settings.rock_start;
+    state.snow_start = settings.snow_start;
     state.rotation_deg = slider_angle_from_resource(params.rotation_deg);
     state.sun_brightness = sun_settings.brightness;
     state.camera_altitude = 0.0;
@@ -666,9 +732,10 @@ fn toggle_panel_visibility(
 fn update_fps_display(
     time: Res<Time>,
     params: Res<PlanetParams>,
+    surface: Res<PlanetSurfaceModel>,
     mut state: ResMut<DevPanelState>,
     mut fps_text: Query<&mut Text, With<FpsText>>,
-    q_cam: Query<&GlobalTransform, With<MainCamera>>,
+    q_cam: Query<(&GlobalTransform, Option<&GalaxyCamera>), With<MainCamera>>,
     q_planet: Query<&GlobalTransform, With<PlanetTag>>,
 ) {
     let dt = time.delta_secs();
@@ -682,13 +749,22 @@ fn update_fps_display(
         };
     }
 
-    if let (Some(cam_tf), Some(planet_tf)) = (q_cam.iter().next(), q_planet.iter().next()) {
+    if let (Some((cam_tf, cam_state)), Some(planet_tf)) =
+        (q_cam.iter().next(), q_planet.iter().next())
+    {
         let center = planet_tf.translation();
         let dist = cam_tf.translation().distance(center);
-        let radius = params.radius.max(1.0);
-        let altitude = (dist - radius).max(0.0);
+        let base_radius = surface.radius.max(params.radius).max(1.0);
+        let mut altitude = (dist - base_radius).max(0.0);
+        let mut zoom_ratio = (dist / base_radius).max(1.0);
+        if let Some(camera) = cam_state {
+            if camera.radius > 0.0 {
+                altitude = (camera.radius - base_radius).max(0.0);
+                zoom_ratio = (camera.radius / base_radius).max(1.0);
+            }
+        }
         state.camera_altitude = altitude;
-        state.zoom_ratio = (dist / radius).max(1.0);
+        state.zoom_ratio = zoom_ratio;
     }
 
     if let Ok(mut text) = fps_text.single_mut() {
@@ -1041,11 +1117,9 @@ fn apply_changes(
     mut sun_settings: ResMut<SunSettings>,
     sun_direction: Res<SunDirection>,
     debug: Res<PlanetDebugConfig>,
+    mut surface_model: ResMut<PlanetSurfaceModel>,
     mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut planet_materials: ResMut<Assets<PlanetSurfaceMaterial>>,
-    mut atmosphere_materials: ResMut<Assets<AtmosphereMaterial>>,
-    mut standard_materials: ResMut<Assets<StandardMaterial>>,
+    mut assets: DevPanelAssets,
     planets: Query<Entity, With<PlanetTag>>,
     roots: Query<Entity, With<MapRoot>>,
     children_q: Query<&Children>,
@@ -1073,6 +1147,25 @@ fn apply_changes(
     planet_settings.warp_freq = state.warp_freq.max(0.0);
     planet_settings.warp_amp = state.warp_amp.max(0.0);
     planet_settings.mountain_strength = state.mountain_strength.clamp(0.0, 1.0);
+    let mut sand_height = state.sand_height.clamp(0.0, 1.0);
+    let mut rock_start = state.rock_start.clamp(0.0, 1.0);
+    let mut snow_start = state.snow_start.clamp(0.0, 1.0);
+    const ALT_GAP: f32 = 0.02;
+    if rock_start <= sand_height + ALT_GAP {
+        rock_start = (sand_height + ALT_GAP).min(0.98);
+    }
+    if snow_start <= rock_start + ALT_GAP {
+        snow_start = (rock_start + ALT_GAP).min(0.995);
+    }
+    if sand_height >= rock_start {
+        sand_height = (rock_start - ALT_GAP).max(0.0);
+    }
+    planet_settings.sand_height = sand_height;
+    planet_settings.rock_start = rock_start;
+    planet_settings.snow_start = snow_start;
+    state.sand_height = sand_height;
+    state.rock_start = rock_start;
+    state.snow_start = snow_start;
 
     let sun_descriptor = descriptor_for(ParameterKind::SunBrightness);
     let brightness = sun_descriptor.clamp(state.sun_brightness);
@@ -1139,19 +1232,23 @@ fn apply_changes(
         &planet_settings,
         &sampler,
     );
+    surface_model.radius = planet_params.radius;
+    surface_model.biome_resolution = DEFAULT_BIOME_MAP_RESOLUTION;
 
     spawn_random_planet_inner(
         &mut commands,
-        &mut meshes,
-        &mut *planet_materials,
-        &mut *atmosphere_materials,
-        &mut *standard_materials,
+        &mut assets.meshes,
+        &mut *assets.planet_materials,
+        &mut *assets.atmosphere_materials,
+        &mut *assets.standard_materials,
+        &mut *assets.images,
         &*sampler,
         &*map,
         &*planet_params,
         &*planet_settings,
         &*debug,
         &*sun_direction,
+        &mut *surface_model,
     );
 }
 
@@ -1224,6 +1321,9 @@ impl DevPanelState {
             ParameterKind::WarpFreq => self.warp_freq,
             ParameterKind::WarpAmp => self.warp_amp,
             ParameterKind::Mountains => self.mountain_strength,
+            ParameterKind::SandHeight => self.sand_height,
+            ParameterKind::RockHeight => self.rock_start,
+            ParameterKind::SnowHeight => self.snow_start,
             ParameterKind::Rotation => self.rotation_deg,
             ParameterKind::SunBrightness => self.sun_brightness,
         }
@@ -1241,6 +1341,9 @@ impl DevPanelState {
             ParameterKind::WarpFreq => &mut self.warp_freq,
             ParameterKind::WarpAmp => &mut self.warp_amp,
             ParameterKind::Mountains => &mut self.mountain_strength,
+            ParameterKind::SandHeight => &mut self.sand_height,
+            ParameterKind::RockHeight => &mut self.rock_start,
+            ParameterKind::SnowHeight => &mut self.snow_start,
             ParameterKind::Rotation => &mut self.rotation_deg,
             ParameterKind::SunBrightness => &mut self.sun_brightness,
         };

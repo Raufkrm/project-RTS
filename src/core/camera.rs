@@ -4,8 +4,9 @@ use bevy::window::PrimaryWindow;
 use std::f32::consts::PI;
 
 use crate::app::AppState;
-use crate::core::galaxy_camera::MainCamera;
-use crate::core::planet_camera::{ScaleFovByAltitude, ScaledWheelZoom};
+use crate::core::galaxy_camera::{MainCamera, PlanetZoomConfig};
+use crate::core::planet_camera::ScaleFovByAltitude;
+use crate::core::surface_model::PlanetSurfaceModel;
 use crate::game::world::planet::PlanetParams;
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -14,7 +15,8 @@ use crate::game::world::planet::PlanetParams;
 pub struct EditorCameraPlugin;
 impl Plugin for EditorCameraPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
+        app.init_resource::<PlanetZoomConfig>()
+            .add_systems(
             OnEnter(AppState::InGame),
             (despawn_existing_cameras, spawn_camera),
         )
@@ -50,7 +52,7 @@ const MAX_PX_STEP: f32 = 50.0; // clamp per-frame mouse delta
                                // per-notch zoom rates (tiny, multiplicative)
 const ZOOM_RATE_SURF: f32 = 0.02; // altitude scale per notch
 const ZOOM_RATE_FP: f32 = 0.03;
-const ZOOM_RATE_ORBIT: f32 = 0.01; // orbit-distance scale per notch
+const ORBIT_ZOOM_SPEED: f32 = 0.1;
 
 // smoothing (critically damped)
 const TAU_ROT: f32 = 0.06;
@@ -138,6 +140,46 @@ fn ray_sphere_hit(eye: Vec3, dir: Vec3, r: f32) -> Option<Vec3> {
     Some(eye + dir * t)
 }
 
+#[inline]
+fn zoom_t_to_radius(
+    zoom_t: f32,
+    zoom_cfg: &PlanetZoomConfig,
+    surface: &PlanetSurfaceModel,
+) -> f32 {
+    let base_radius = surface.radius.max(1.0);
+    let min_alt = zoom_cfg.min_altitude.max(0.0);
+    let max_alt = zoom_cfg
+        .max_altitude
+        .max(min_alt + 1.0);
+    let min_r = base_radius + min_alt;
+    let max_r = base_radius + max_alt;
+    let t = zoom_t.clamp(0.0, 1.0);
+    let ln_min = min_r.ln();
+    let ln_max = max_r.ln();
+    let ln_r = ln_min + t * (ln_max - ln_min);
+    ln_r.exp()
+}
+
+#[inline]
+fn radius_to_zoom_t(
+    radius: f32,
+    zoom_cfg: &PlanetZoomConfig,
+    surface: &PlanetSurfaceModel,
+) -> f32 {
+    let base_radius = surface.radius.max(1.0);
+    let min_alt = zoom_cfg.min_altitude.max(0.0);
+    let max_alt = zoom_cfg
+        .max_altitude
+        .max(min_alt + 1.0);
+    let min_r = base_radius + min_alt;
+    let max_r = base_radius + max_alt;
+    if (max_r - min_r).abs() <= f32::EPSILON {
+        return 0.0;
+    }
+    let clamped = radius.clamp(min_r, max_r);
+    ((clamped.ln() - min_r.ln()) / (max_r.ln() - min_r.ln())).clamp(0.0, 1.0)
+}
+
 // ──────────────────────────────────────────────────────────────────────────────
 // Component
 // ──────────────────────────────────────────────────────────────────────────────
@@ -149,6 +191,10 @@ pub struct GameCamera {
     // Orbit
     pub orbit_dist: f32,
     pub target_orbit_dist: f32,
+    /// Normalized zoom in [0, 1], 0 = close to surface, 1 = far orbit.
+    pub zoom_t: f32,
+    /// Cached radius for the current zoom (meters from planet center).
+    pub radius: f32,
 
     // Surface / FP
     pub focus: Vec3,
@@ -181,9 +227,16 @@ fn despawn_existing_cameras(mut commands: Commands, cams: Query<Entity, With<Cam
     }
 }
 
-fn spawn_camera(mut commands: Commands, planet: Option<Res<PlanetParams>>) {
+fn spawn_camera(
+    mut commands: Commands,
+    planet: Option<Res<PlanetParams>>,
+    surface: Res<PlanetSurfaceModel>,
+) {
     // Start near surface on +Z with cinematic tilt
-    let r = planet.as_ref().map(|p| p.radius).unwrap_or(6.0);
+    let mut r = surface.radius;
+    if r <= 0.0 {
+        r = planet.as_ref().map(|p| p.radius).unwrap_or(6.0);
+    }
     let start_alt = 8.0;
     let focus = Vec3::new(0.0, 0.0, r);
     let yaw = 0.0;
@@ -207,11 +260,6 @@ fn spawn_camera(mut commands: Commands, planet: Option<Res<PlanetParams>>) {
             brightness: 140.0,
             affects_lightmapped_meshes: true,
         },
-        ScaledWheelZoom {
-            base_speed: 120.0,
-            speed_per_radius: 1.6,
-            smoothing: 0.15,
-        },
         PlanetCamera::default(),
         MainCamera,
         GameCamera {
@@ -219,6 +267,8 @@ fn spawn_camera(mut commands: Commands, planet: Option<Res<PlanetParams>>) {
             pitch,
             orbit_dist: r + 60.0,
             target_orbit_dist: r + 60.0,
+            zoom_t: 0.5,
+            radius: r + start_alt,
             focus,
             target_focus: focus,
             altitude: start_alt,
@@ -250,6 +300,8 @@ fn update_camera(
     windows: Query<&Window, With<PrimaryWindow>>,
     mut q: Query<(&mut Transform, &mut GameCamera)>,
     planet: Option<Res<PlanetParams>>,
+    surface: Res<PlanetSurfaceModel>,
+    zoom_cfg: Res<PlanetZoomConfig>,
 ) {
     let dt = time.delta_secs();
     let Ok(window) = windows.single() else {
@@ -261,7 +313,10 @@ fn update_camera(
         Ok(v) => v,
         Err(_) => return,
     };
-    let r = planet.as_ref().map(|p| p.radius).unwrap_or(6.0);
+    let mut r = surface.radius;
+    if r <= 0.0 {
+        r = planet.as_ref().map(|p| p.radius).unwrap_or(6.0);
+    }
     let orbit_enter_alt = r * ORBIT_ENTER_FRAC;
     let orbit_exit_alt = r * ORBIT_EXIT_FRAC;
 
@@ -331,7 +386,12 @@ fn update_camera(
             }
             if cam.target_altitude >= orbit_enter_alt {
                 cam.mode = CameraMode::Orbit;
-                cam.target_orbit_dist = r + cam.target_altitude;
+                let desired_radius = (r + cam.target_altitude)
+                    .clamp(r + zoom_cfg.min_altitude, r + zoom_cfg.max_altitude);
+                cam.zoom_t = radius_to_zoom_t(desired_radius, &zoom_cfg, &surface);
+                cam.target_orbit_dist = desired_radius;
+                cam.orbit_dist = desired_radius;
+                cam.radius = desired_radius;
             }
         }
         CameraMode::FirstPerson => {
@@ -347,10 +407,11 @@ fn update_camera(
         }
         CameraMode::Orbit => {
             if zoom_units != 0.0 {
-                let factor = (1.0 - zoom_units * ZOOM_RATE_ORBIT).clamp(0.5, 1.5);
-                cam.target_orbit_dist =
-                    (cam.target_orbit_dist * factor).clamp(r + FP_EXIT_ALT, r * MAX_ORBIT_FACTOR);
+                cam.zoom_t = (cam.zoom_t - zoom_units * ORBIT_ZOOM_SPEED).clamp(0.0, 1.0);
             }
+            let desired_radius = zoom_t_to_radius(cam.zoom_t, &zoom_cfg, &surface);
+            cam.target_orbit_dist =
+                desired_radius.clamp(r + FP_EXIT_ALT, r * MAX_ORBIT_FACTOR);
 
             if cam.target_orbit_dist <= r + orbit_exit_alt {
                 // derive surface state from the current orbit view (no jump)
@@ -375,6 +436,7 @@ fn update_camera(
                 cam.pitch = pitch;
                 cam.altitude = alt_now;
                 cam.target_altitude = alt_now;
+                cam.radius = r + alt_now;
 
                 // clear interaction state so there’s no leftover drag
                 cam.panning = false;
@@ -406,9 +468,10 @@ fn update_camera(
             }
 
             cam.orbit_dist = smooth_to(cam.orbit_dist, cam.target_orbit_dist, dt, TAU_ZOOM);
+            cam.radius = cam.orbit_dist;
 
             let dir = Quat::from_euler(EulerRot::YXZ, cam.yaw, cam.pitch, 0.0) * Vec3::NEG_Z;
-            let eye = -dir * cam.orbit_dist;
+            let eye = -dir * cam.radius;
             t.translation = eye;
             t.look_at(Vec3::ZERO, Vec3::Y);
         }
@@ -461,10 +524,12 @@ fn update_camera(
             let forward = (Quat::from_axis_angle(up, cam.yaw)
                 * Quat::from_axis_angle(east, cam.pitch))
                 * (-north);
-            let eye = cam.focus + up * cam.altitude.max(FP_ENTER_ALT);
+            let actual_alt = cam.altitude.max(FP_ENTER_ALT);
+            let eye = cam.focus + up * actual_alt;
 
             t.translation = eye;
             t.look_to(forward, up);
+            cam.radius = r + actual_alt;
         }
 
         // ─────────────────────── FIRST PERSON ────────────────────────
@@ -541,6 +606,7 @@ fn update_camera(
 
             t.translation = eye;
             t.look_to(forward, up);
+            cam.radius = r + FP_ENTER_ALT;
         }
     }
 }

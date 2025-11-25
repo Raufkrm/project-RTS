@@ -5,15 +5,15 @@ Imagine a mapmaker tasked with creating a detailed atlas of the entire world, bu
 Instead, a "dynamic mapmaker" would do this:
 
     From space: It generates a simple, low-detail map of the continents and oceans. You see a solid green shape for a forest because from far away, that's all you need to see.
-    As you zoom closer: When you move toward a particular country, the mapmaker's tools create more detailed features, like rivers, mountains, and the borders of states. The solid green shape begins to resolve into distinct areas of forest and farmland.
-    As you approach a city: The mapmaker swaps the landscape details for city details, generating roads, buildings, and parks on the fly. The game engine is "streaming" in new information that wasn't previously necessary.
+    As you zoom closer: When you move toward a particular country, the mapmaker's tools create more detailed features, like rivers, mountains, there are no borders and no states. The solid green shape begins to resolve into distinct areas of forest and farmland.
+    As you approach a surface more and more details begin to emerge(its like falling from space to the surface). The game engine is "streaming" in new information that wasn't previously necessary.
     On the surface: When you land on the planet, the mapmaker uses a "seed" (a small amount of pre-defined data) and algorithms to procedurally generate the exact location. This is where your buildings, units, and resources for the RTS game would be created. The level designer doesn't hand-craft every rock; they create the rules for what kind of rocks appear there.
 
 The key concepts in more detail
 1. Level of Detail (LOD)
 This is the process of displaying different, pre-made versions of an asset based on its distance from the camera.
 
-    For the RTS: From space, a planetary city might be rendered as a single, low-polygon mesh with a simple texture.
+    For the RTS: From space, a planetary city might be rendered as a single speck of light.
     On the surface: When you zoom in, that simple shape is replaced by a complex, high-polygon model of the city, complete with individual buildings, lights, and windows.
     The illusion: The transition is managed smoothly so you never notice the swap. The game engine saves immense computing power by only rendering high-detail assets when they are close enough to be seen clearly.
 

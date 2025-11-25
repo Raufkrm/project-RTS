@@ -1,0 +1,147 @@
+Planet Pipeline — Context File (TXT)
+
+High-Level Architecture
+- Inputs: radius, water_height, temp, moisture, altitude_bias, biome_scale, seed.
+- Global Biome ID Map (GBM): cube/octa projection, one byte per texel.
+- Virtual Texture (VT): albedo, normal, material layers streamed by page.
+- Decal System: base author decals + runtime gameplay stamps.
+- Navigation uses the same cube basis (sector grid + lazy flow/cost fields).
+- Deformation updates mesh + VT overlay pages only where touched.
+
+Invariants
+- All LODs see the same biome id at the same surface coordinate.
+- GBM is authoritative; VT is only the material realization.
+- Cube/octa projection is shared across render, nav, decals, deformation.
+- VT base pages are static; gameplay writes go to overlay deltas.
+- Nav fields are lazy and disposable.
+
+Coordinate System
+- Surface point P = normalized direction * (radius + height).
+- Basis mapping: normalize(P) → (face, u, v) via cube/octa projection.
+- All subsystems must use the same basis library.
+
+Data Models
+
+1) Global Biome Map (GBM): R8
+Cube faces:
+  px.r8, nx.r8, py.r8, ny.r8, pz.r8, nz.r8
+Metadata lists biome ids and names.
+
+2) Virtual Texture (VT)
+Page size: 128–256 px
+Mips: several clip levels (orbit → ground)
+Layers:
+  albedo: BC7
+  normal: BC5
+  material: BC1/BC4 or custom param packing
+Cache budget: a few thousand resident pages total.
+
+3) Decal Records
+Fields: id, blend mode, radius_m, albedo tint, roughness add, normal scale.
+Author decals baked offline; gameplay decals stamped to overlay pages.
+
+4) Navigation
+Sector grid defined in the same cube projection.
+Movement classes: land_small, land_heavy, hover, ship, submarine, seabed, air, orbital.
+Fields per sector/class:
+  cost: R8
+  integration: R16 or R32F temp
+  flow: packed direction (4-bit)
+
+Build Pipeline
+
+1) Climate Synthesis
+- Compute temp/moisture/altitude fields.
+- Classify to biome_id per texel.
+- Output GBM faces.
+
+2) VT Bake (Offline)
+- For every page: evaluate biome material stacks + macro/noise.
+- Compress pages.
+- Apply author decals.
+- Generate multi-mip clipmaps.
+
+3) Packaging
+- Group pages by mip ring or face.
+- Store manifest with page hashes and offsets.
+
+Runtime Streaming
+- Frustum + horizon determine needed pages.
+- Resolve (face, mip, page_u, page_v).
+- Cache: LRU with prefetch in camera motion direction.
+- Upload pages to GPU incrementally; avoid stalls.
+
+Rendering
+- Lookup biome_id via GBM.
+- Sample VT (albedo/normal/material).
+- Deferred lighting for sun + many point lights.
+- Radial ambient for night-side readability.
+- Forward pass only for transparent materials.
+- Geometry LOD affects mesh density; material stays continuous.
+
+Decals (Runtime)
+- Stamp operations target overlay pages.
+- Overlay blended in shader over base VT.
+- Limit number of overlay pages; evict least-recent.
+
+Deformation
+- Apply CSG brush to surface mesh.
+- Identify intersecting VT pages.
+- Update overlay pages for crater/wear effects.
+- Recompute local water fill.
+
+Navigation
+- A* on sector graph to choose corridor.
+- Build cost/integration/flow only for needed sectors.
+- Dynamic cost insertion for obstacles and congestion.
+- Evict inactive sectors to keep memory bounded.
+
+Performance Targets
+- VT resident pages: ~3–6k
+- Upload bandwidth: ~300–600 MB/s
+- Deferred lighting with many small point lights
+- Active nav sectors per class: bounded (~≤2000)
+
+Failures / Guards
+- Page thrash → increase prefetch/horizon.
+- Seam mismatch → single shared basis math code.
+- Excess overlay stamps → batch and merge writes.
+- Deformation stall → run edits on worker threads.
+
+Minimal Interfaces (Pseudocode)
+biome_id_at(dir3) → u8
+vt_sample(dir3, mip_bias) → {albedo, normal_ts, material}
+vt_request_pages(range)
+decal_stamp(def, center_dir3, radius_m, rotation)
+deform_sphere(center_dir3, radius_m, depth_m, hardness)
+build_flow(goal, move_class) → handle
+query_dir(handle, dir3) → 2D direction
+inject_cost(area, move_class, cost, ttl_ms)
+
+Asset Formats
+- GBM faces: raw R8 + JSON meta.
+- VT pages: BCn compressed + manifest.
+- Overlay pages: RGBA8/BCn depending on blend path.
+
+Tooling Commands (Conceptual)
+bake_gbm(...)
+bake_vt(...)
+bake_decals(...)
+validate_basis(...)
+profile_vt_cache(...)
+
+Implementation Order
+1) Basis mapping library
+2) GBM generator and sampling
+3) VT cache + shader sampling
+4) Author and runtime decals
+5) Deferred lighting + radial ambient
+6) Nav sector + flow fields
+7) Deformation with VT overlay updates
+
+Acceptance Criteria
+- Biome identity is stable across LOD.
+- No visible tiling; decals provide breakup.
+- LOD transitions are smooth; only detail refines.
+- VT cache remains within memory limits.
+- Deformations update shading and nav locally without stutter.

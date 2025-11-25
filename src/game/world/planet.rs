@@ -1,15 +1,21 @@
 use crate::core::planet_debug::LodDebugBands;
+use crate::core::surface_model::{cube_face_dir, dir_to_face_uv, PlanetSurfaceModel, SurfaceCoord};
+use crate::game::planet_surface::biome::BiomeClassifier;
 use crate::game::world::sampling::FlatSamplerRes;
+use crate::game::world::surface_grid::{self, SurfaceGrid};
 use crate::game::world::terrain::MapSettings;
 use crate::game::SunDirection;
 use bevy::asset::RenderAssetUsages;
+use bevy::image::ImageSampler;
 use bevy::log::info;
 use bevy::math::primitives::Sphere;
 use bevy::pbr::{wireframe::Wireframe, MaterialExtension, StandardMaterial};
 use bevy::prelude::*;
 use bevy::reflect::TypePath;
 use bevy::render::alpha::AlphaMode;
-use bevy::render::render_resource::{AsBindGroup, PrimitiveTopology, ShaderType};
+use bevy::render::render_resource::{
+    AsBindGroup, Extent3d, PrimitiveTopology, ShaderType, TextureDimension, TextureFormat,
+};
 use bevy::shader::ShaderRef; // correct place for your Bevy version
 use bevy_mesh::{Indices, Mesh, VertexAttributeValues};
 use std::cmp::Ordering;
@@ -62,6 +68,7 @@ pub struct PlanetSurfaceUniform {
     pub perceptual_roughness: f32,
     pub metallic: f32,
     pub reflectance: f32,
+    pub sand_height: f32,
     pub rock_start: f32,
     pub snow_start: f32,
     pub sun_dir: Vec4,
@@ -142,6 +149,7 @@ impl Default for PlanetSurfaceParams {
                 perceptual_roughness: 0.75,
                 metallic: 0.0,
                 reflectance: 0.04,
+                sand_height: 0.08,
                 rock_start: 0.54,
                 snow_start: 0.82,
                 sun_dir: default_sun.extend(0.0),
@@ -205,6 +213,7 @@ impl PlanetSurfaceParams {
                 perceptual_roughness: 0.75,
                 metallic: 0.0,
                 reflectance: 0.04,
+                sand_height: settings.sand_height,
                 rock_start: settings.rock_start,
                 snow_start: settings.snow_start,
                 sun_dir: dir.extend(0.0),
@@ -276,6 +285,8 @@ pub struct PlanetSettings {
     pub land_rock: Vec3,
     /// Snow/ice color (highest altitudes)
     pub land_snow: Vec3,
+    /// Elevation (0..1 above sea) where sand fades to soil/grass
+    pub sand_height: f32,
     /// Elevation (0..1 above sea) where grass fades to rock
     pub rock_start: f32,
     /// Elevation (0..1 above sea) where rock fades to snow
@@ -301,13 +312,214 @@ impl Default for PlanetSettings {
 
             land_rock: Vec3::new(0.48, 0.5, 0.54), // cooler granite
             land_snow: Vec3::new(0.95, 0.98, 1.0), // crisp snow
+            sand_height: 0.08,                     // sandy shelf depth
             rock_start: 0.54,                      // grass fades to rock
             snow_start: 0.82,                      // rock fades to snow
         }
     }
 }
 
-struct ClimateModel<'a> {
+pub const DEFAULT_BIOME_MAP_RESOLUTION: u32 = 256;
+pub const SURFACE_GRID_RESOLUTION: u32 = 512; // start with 512; can tune later
+pub const SKIRT_LAND_MASK_BITS: u32 = 0xFFFF;
+
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum CubeFace {
+    PositiveX = 0,
+    NegativeX = 1,
+    PositiveY = 2,
+    NegativeY = 3,
+    PositiveZ = 4,
+    NegativeZ = 5,
+}
+
+impl CubeFace {
+    pub const ALL: [CubeFace; 6] = [
+        CubeFace::PositiveX,
+        CubeFace::NegativeX,
+        CubeFace::PositiveY,
+        CubeFace::NegativeY,
+        CubeFace::PositiveZ,
+        CubeFace::NegativeZ,
+    ];
+
+    #[inline]
+    pub const fn as_index(self) -> usize {
+        self as usize
+    }
+}
+
+#[derive(Resource, Clone)]
+pub struct GlobalBiomeMap {
+    pub resolution: u32,
+    pub faces: [Vec<u8>; 6],
+}
+
+impl GlobalBiomeMap {
+    #[inline]
+    pub fn texels_for_face(&self, face: CubeFace) -> &[u8] {
+        &self.faces[face.as_index()]
+    }
+
+    #[inline]
+    pub fn texels_for_face_mut(&mut self, face: CubeFace) -> &mut [u8] {
+        &mut self.faces[face.as_index()]
+    }
+
+    #[inline]
+    pub fn texel_index(&self, x: u32, y: u32) -> usize {
+        (y * self.resolution + x) as usize
+    }
+
+    #[inline]
+    pub fn sample_biome(&self, dir: Vec3) -> u8 {
+        if dir.length_squared() <= f32::EPSILON {
+            return 0;
+        }
+        let normalized = dir.normalize_or_zero();
+        let (face, uv) = dir_to_face_uv(normalized);
+        let coord = SurfaceCoord {
+            face,
+            uv,
+            height: 0.0,
+        };
+        sample_biome_face_uv(self, coord)
+    }
+}
+
+#[inline]
+fn sample_biome_face_uv(map: &GlobalBiomeMap, coord: SurfaceCoord) -> u8 {
+    if map.resolution == 0 {
+        return 0;
+    }
+    let res = map.resolution;
+    let max_idx = res - 1;
+    let sample_idx = |value: f32| -> u32 {
+        let clamped = value.clamp(0.0, 1.0);
+        let scaled = clamped * res as f32;
+        scaled.clamp(0.0, max_idx as f32).floor() as u32
+    };
+    let x = sample_idx(coord.uv.x);
+    let y = sample_idx(coord.uv.y);
+    let idx = (y * res + x) as usize;
+    let face_index = coord.face.min(5) as usize;
+    let texels = &map.faces[face_index];
+    texels.get(idx).copied().unwrap_or(0)
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct PlanetClimateSample {
+    pub uv1: [f32; 2],
+    pub packed: [f32; 4],
+}
+
+#[allow(dead_code)]
+fn cube_face_direction(face: CubeFace, u: f32, v: f32) -> Vec3 {
+    let sx = u * 2.0 - 1.0;
+    let sy = v * 2.0 - 1.0;
+    match face {
+        CubeFace::PositiveX => Vec3::new(1.0, -sy, -sx),
+        CubeFace::NegativeX => Vec3::new(-1.0, -sy, sx),
+        CubeFace::PositiveY => Vec3::new(sx, 1.0, sy),
+        CubeFace::NegativeY => Vec3::new(sx, -1.0, -sy),
+        CubeFace::PositiveZ => Vec3::new(sx, -sy, 1.0),
+        CubeFace::NegativeZ => Vec3::new(-sx, -sy, -1.0),
+    }
+    .normalize_or_zero()
+}
+
+#[allow(dead_code)]
+fn direction_to_cube_face_uv(dir: Vec3) -> (CubeFace, f32, f32) {
+    let abs = dir.abs();
+    let (face, major, uc, vc) = if abs.x >= abs.y && abs.x >= abs.z {
+        if dir.x >= 0.0 {
+            (CubeFace::PositiveX, abs.x, -dir.z, dir.y)
+        } else {
+            (CubeFace::NegativeX, abs.x, dir.z, dir.y)
+        }
+    } else if abs.y >= abs.x && abs.y >= abs.z {
+        if dir.y >= 0.0 {
+            (CubeFace::PositiveY, abs.y, dir.x, dir.z)
+        } else {
+            (CubeFace::NegativeY, abs.y, dir.x, -dir.z)
+        }
+    } else if dir.z >= 0.0 {
+        (CubeFace::PositiveZ, abs.z, dir.x, -dir.y)
+    } else {
+        (CubeFace::NegativeZ, abs.z, -dir.x, -dir.y)
+    };
+
+    if major <= f32::EPSILON {
+        return (CubeFace::PositiveZ, 0.5, 0.5);
+    }
+
+    let u = 0.5 * (uc / major + 1.0);
+    let v = 0.5 * (vc / major + 1.0);
+    (face, u.clamp(0.0, 1.0), v.clamp(0.0, 1.0))
+}
+
+pub fn bake_global_biome_map(
+    climate: &ClimateModel,
+    classifier: &BiomeClassifier,
+    resolution: u32,
+) -> GlobalBiomeMap {
+    let face_len = (resolution * resolution) as usize;
+    let mut faces = std::array::from_fn(|_| vec![0u8; face_len]);
+
+    for face in CubeFace::ALL {
+        let texels = &mut faces[face.as_index()];
+        for y in 0..resolution {
+            let v = (y as f32 + 0.5) / resolution as f32;
+            for x in 0..resolution {
+                let u = (x as f32 + 0.5) / resolution as f32;
+                let uv = Vec2::new(u, v);
+                let dir = cube_face_dir(face.as_index() as u8, uv);
+                let sample = climate.sample(dir);
+                let biome = classifier.classify_sample(&sample);
+                texels[(y * resolution + x) as usize] = biome as u8;
+            }
+        }
+    }
+
+    GlobalBiomeMap { resolution, faces }
+}
+
+fn bake_surface_grid(
+    climate: &ClimateModel,
+    classifier: &BiomeClassifier,
+    resolution: u32,
+) -> SurfaceGrid {
+    let mut grid = SurfaceGrid::default();
+    if resolution == 0 {
+        return grid;
+    }
+
+    grid.resolution = resolution;
+    let face_len = (resolution * resolution) as usize;
+    for face in 0..6 {
+        grid.heights[face].resize(face_len, 0.0);
+        grid.biomes[face].resize(face_len, 0);
+        for y in 0..resolution {
+            let v = (y as f32 + 0.5) / resolution as f32;
+            for x in 0..resolution {
+                let u = (x as f32 + 0.5) / resolution as f32;
+                let uv = Vec2::new(u, v);
+                let dir = cube_face_dir(face as u8, uv).normalize_or_zero();
+                let eval = climate.evaluate(dir);
+                let sample = PlanetClimateSample::from_eval(&eval);
+                let biome = classifier.classify_sample(&sample) as u8;
+                let index = surface_grid::idx(resolution, x, y);
+                grid.heights[face][index] = eval.mountain_offset;
+                grid.biomes[face][index] = biome;
+            }
+        }
+    }
+
+    grid
+}
+
+pub(crate) struct ClimateModel<'a> {
     params: &'a PlanetParams,
     settings: &'a PlanetSettings,
     seed: u64,
@@ -361,6 +573,31 @@ struct ClimateEval {
     gradient: Vec3,
 }
 
+impl PlanetClimateSample {
+    fn from_eval(eval: &ClimateEval) -> Self {
+        let packed_md = pack_pair(eval.moisture, eval.dryness);
+        let packed_cs = pack_pair(eval.coast_band, eval.snow_score);
+        let packed_ht = pack_pair(eval.height01, eval.temperature);
+        let continent_norm = ((eval.continent_value + 1.0) * 0.5).clamp(0.0, 1.0);
+        let packed_sl = pack_pair(eval.slope.clamp(0.0, 1.0), continent_norm);
+        let packed_mr = pack_pair(
+            eval.mountain_mask.clamp(0.0, 1.0),
+            eval.ridge_light.clamp(0.0, 1.0),
+        );
+        let depth_or_valley = if eval.depth > 1e-4 {
+            eval.depth
+        } else {
+            eval.valley_shadow.clamp(0.0, 1.0)
+        };
+        let packed_lv = pack_pair(depth_or_valley, eval.land_mask.clamp(0.0, 1.0));
+
+        Self {
+            uv1: [packed_md, packed_cs],
+            packed: [packed_ht, packed_sl, packed_mr, packed_lv],
+        }
+    }
+}
+
 impl<'a> ClimateModel<'a> {
     fn new(seed: u64, params: &'a PlanetParams, settings: &'a PlanetSettings) -> Self {
         let base_f = settings.base_freq.max(1e-5);
@@ -392,6 +629,11 @@ impl<'a> ClimateModel<'a> {
             dryness_bias_global,
             sea_level,
         }
+    }
+
+    pub fn sample(&self, dir: Vec3) -> PlanetClimateSample {
+        let eval = self.evaluate(dir.normalize_or_zero());
+        PlanetClimateSample::from_eval(&eval)
     }
 
     fn sample_fields(&self, coord: Vec3) -> ClimateFields {
@@ -936,12 +1178,14 @@ pub fn spawn_random_planet_inner(
     planet_materials: &mut Assets<PlanetSurfaceMaterial>,
     atmosphere_materials: &mut Assets<AtmosphereMaterial>,
     standard_materials: &mut Assets<StandardMaterial>,
+    images: &mut Assets<Image>,
     sampler_res: &FlatSamplerRes,
     map: &MapSettings,
     params: &PlanetParams,
     settings: &PlanetSettings,
     debug: &PlanetDebugConfig,
     sun_direction: &SunDirection,
+    surface_model: &mut PlanetSurfaceModel,
 ) {
     log_planet_configuration(
         "spawn_random_planet_inner",
@@ -957,12 +1201,14 @@ pub fn spawn_random_planet_inner(
         planet_materials,
         atmosphere_materials,
         standard_materials,
+        images,
         sampler_res,
         map,
         params,
         settings,
         sun_direction,
         debug,
+        surface_model,
     );
 }
 
@@ -974,12 +1220,14 @@ pub fn spawn_random_planet_with_settings_system(
     mut planet_materials: ResMut<Assets<PlanetSurfaceMaterial>>,
     mut atmosphere_materials: ResMut<Assets<AtmosphereMaterial>>,
     mut standard_materials: ResMut<Assets<StandardMaterial>>,
+    mut images: ResMut<Assets<Image>>,
     sampler_res: Res<FlatSamplerRes>,
     map: Res<MapSettings>,
     params: Res<PlanetParams>,
     settings: Res<PlanetSettings>,
     debug: Res<PlanetDebugConfig>,
     sun_direction: Res<SunDirection>,
+    mut surface_model: ResMut<PlanetSurfaceModel>,
 ) {
     log_planet_configuration(
         "spawn_random_planet_with_settings_system",
@@ -988,6 +1236,8 @@ pub fn spawn_random_planet_with_settings_system(
         &settings,
         &sampler_res,
     );
+    surface_model.radius = params.radius;
+    surface_model.biome_resolution = DEFAULT_BIOME_MAP_RESOLUTION;
 
     spawn_planet_with_settings(
         &mut commands,
@@ -995,12 +1245,14 @@ pub fn spawn_random_planet_with_settings_system(
         &mut *planet_materials,
         &mut *atmosphere_materials,
         &mut *standard_materials,
+        &mut *images,
         &sampler_res,
         &map,
         &params,
         &settings,
         &*sun_direction,
         &debug,
+        &mut *surface_model,
     );
 }
 
@@ -1010,12 +1262,14 @@ fn spawn_planet_with_settings(
     planet_materials: &mut Assets<PlanetSurfaceMaterial>,
     atmosphere_materials: &mut Assets<AtmosphereMaterial>,
     standard_materials: &mut Assets<StandardMaterial>,
+    images: &mut Assets<Image>,
     sampler_res: &FlatSamplerRes,
     _map: &MapSettings,
     params: &PlanetParams,
     settings: &PlanetSettings,
     sun_direction: &SunDirection,
     debug: &PlanetDebugConfig,
+    surface_model: &mut PlanetSurfaceModel,
 ) {
     let climate_summary = analyze_planet_climate(sampler_res.0.seed, params, settings);
     info!(
@@ -1029,13 +1283,43 @@ fn spawn_planet_with_settings(
         climate_summary.avg_land_dryness,
     );
 
-    let land_mesh = build_colored_planet_mesh(settings, sampler_res, params, debug.mode);
+    let classifier = BiomeClassifier::default();
+    let climate_for_bake = ClimateModel::new(sampler_res.0.seed, params, settings);
+    let biome_map =
+        bake_global_biome_map(&climate_for_bake, &classifier, DEFAULT_BIOME_MAP_RESOLUTION);
+    info!(
+        "baked global biome map at {}^2 texels per cube face",
+        biome_map.resolution
+    );
+    let surface_grid =
+        bake_surface_grid(&climate_for_bake, &classifier, SURFACE_GRID_RESOLUTION);
+    if surface_grid.resolution > 0 {
+        info!(
+            "baked surface grid at {}^2 samples per cube face",
+            surface_grid.resolution
+        );
+    } else {
+        info!("surface grid resolution is zero; mesh will fall back to procedural sampling");
+    }
+    update_surface_model_biome_faces(surface_model, &biome_map, images);
+
+    let land_mesh = build_colored_planet_mesh(
+        settings,
+        sampler_res,
+        params,
+        debug.mode,
+        Some(&biome_map),
+        surface_model,
+        &surface_grid,
+    );
     if let Some(VertexAttributeValues::Float32x3(positions)) =
         land_mesh.attribute(Mesh::ATTRIBUTE_POSITION)
     {
         info!("planet vertex count: {}", positions.len());
     }
     let handle = meshes.add(land_mesh);
+    commands.insert_resource(surface_grid);
+    commands.insert_resource(biome_map);
 
     let extension = PlanetSurfaceParams::from_settings(
         sampler_res.0.seed,
@@ -1115,6 +1399,37 @@ fn spawn_planet_with_settings(
         ));
     });
 }
+
+fn update_surface_model_biome_faces(
+    surface_model: &mut PlanetSurfaceModel,
+    biome_map: &GlobalBiomeMap,
+    images: &mut Assets<Image>,
+) {
+    let extent = Extent3d {
+        width: biome_map.resolution.max(1),
+        height: biome_map.resolution.max(1),
+        depth_or_array_layers: 1,
+    };
+    for (index, face_data) in biome_map.faces.iter().enumerate() {
+        let mut image = Image::new_fill(
+            extent,
+            TextureDimension::D2,
+            face_data.as_slice(),
+            TextureFormat::R8Uint,
+            RenderAssetUsages::default(),
+        );
+        image.sampler = ImageSampler::nearest();
+
+        let handle = &mut surface_model.biome_faces[index];
+        if handle.is_strong() {
+            let _ = images.insert(handle.id(), image);
+        } else {
+            *handle = images.add(image);
+        }
+    }
+    surface_model.biome_resolution = biome_map.resolution;
+}
+
 pub fn auto_clip_planes(
     mut q_cam: Query<(&GlobalTransform, &mut Projection), With<Camera3d>>,
     q_planet: Query<&GlobalTransform, With<PlanetTag>>,
@@ -1225,6 +1540,9 @@ pub fn update_planet_lod(
     sampler_res: Res<FlatSamplerRes>,
     _map: Res<MapSettings>,        // ok to keep; unused is fine for now
     settings: Res<PlanetSettings>, // <-- add this
+    biome_map: Option<Res<GlobalBiomeMap>>,
+    surface_model: Res<PlanetSurfaceModel>,
+    surface_grid: Res<SurfaceGrid>,
     lod_bands: Res<LodDebugBands>,
     debug: Res<PlanetDebugConfig>,
 ) {
@@ -1232,6 +1550,8 @@ pub fn update_planet_lod(
     let Ok(cam_tf) = q_cam.single() else {
         return;
     };
+
+    let biome_map_ref = biome_map.as_ref().map(|map| &**map);
 
     for (mut lod, mesh_h, planet_tf) in &mut q_planet {
         let center = planet_tf.translation();
@@ -1321,6 +1641,9 @@ pub fn update_planet_lod(
                     &params,
                     &settings,
                     debug.mode,
+                    biome_map_ref,
+                    &surface_model,
+                    &surface_grid,
                 );
                 if let Some(positions) = new.attribute(Mesh::ATTRIBUTE_POSITION) {
                     mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions.clone());
@@ -1369,28 +1692,20 @@ fn build_colored_planet_mesh(
     sampler_res: &FlatSamplerRes,
     params: &PlanetParams,
     debug_mode: PlanetDebugMode,
+    biome_map: Option<&GlobalBiomeMap>,
+    surface_model: &PlanetSurfaceModel,
+    surface_grid: &SurfaceGrid,
 ) -> Mesh {
-    build_colored_planet_mesh_with_subdiv(7, sampler_res, params, settings, debug_mode)
-}
-
-#[inline]
-fn sign_preserve(v: f32) -> f32 {
-    if v < 0.0 {
-        -1.0
-    } else {
-        1.0
-    }
-}
-
-fn encode_unit_octa(n: Vec3) -> [f32; 2] {
-    let mut p = n / (n.x.abs() + n.y.abs() + n.z.abs()).max(1e-6);
-    if p.z < 0.0 {
-        let x = (1.0 - p.y.abs()) * sign_preserve(p.x);
-        let y = (1.0 - p.x.abs()) * sign_preserve(p.y);
-        p.x = x;
-        p.y = y;
-    }
-    [p.x * 0.5 + 0.5, p.y * 0.5 + 0.5]
+    build_colored_planet_mesh_with_subdiv(
+        7,
+        sampler_res,
+        params,
+        settings,
+        debug_mode,
+        biome_map,
+        surface_model,
+        surface_grid,
+    )
 }
 
 fn build_colored_planet_mesh_with_subdiv(
@@ -1399,53 +1714,65 @@ fn build_colored_planet_mesh_with_subdiv(
     params: &PlanetParams,
     settings: &PlanetSettings,
     _debug_mode: PlanetDebugMode,
+    biome_map: Option<&GlobalBiomeMap>,
+    surface_model: &PlanetSurfaceModel,
+    surface_grid: &SurfaceGrid,
 ) -> Mesh {
     let (mut verts, indices_u32) = generate_icosphere(subdiv);
     let climate = ClimateModel::new(sampler_res.0.seed, params, settings);
+    let grid_resolution = surface_grid.resolution;
     let mut packed_attributes: Vec<[f32; 4]> = Vec::with_capacity(verts.len());
     let mut blended_normals: Vec<Vec3> = Vec::with_capacity(verts.len());
-    let mut uvs: Vec<[f32; 2]> = Vec::with_capacity(verts.len());
+    let mut biome_tags: Vec<[f32; 2]> = Vec::with_capacity(verts.len());
     let mut climate_channels: Vec<[f32; 2]> = Vec::with_capacity(verts.len());
+    let classifier = BiomeClassifier::default();
 
     for v in &mut verts {
-        let unit = v.normalize_or_zero();
-        let eval = climate.evaluate(unit);
-        *v = eval.final_pos;
-
-        uvs.push(encode_unit_octa(unit));
-        let packed_md = pack_pair(eval.moisture, eval.dryness);
-        let packed_cs = pack_pair(eval.coast_band, eval.snow_score);
-        climate_channels.push([packed_md, packed_cs]);
-
-        let packed_ht = pack_pair(eval.height01, eval.temperature);
-        let continent_norm = ((eval.continent_value + 1.0) * 0.5).clamp(0.0, 1.0);
-        let packed_sl = pack_pair(eval.slope.clamp(0.0, 1.0), continent_norm);
-        let packed_mr = pack_pair(
-            eval.mountain_mask.clamp(0.0, 1.0),
-            eval.ridge_light.clamp(0.0, 1.0),
-        );
-        let depth_or_valley = if eval.depth > 1e-4 {
-            eval.depth
-        } else {
-            eval.valley_shadow.clamp(0.0, 1.0)
+        let dir = {
+            let normalized = v.normalize_or_zero();
+            if normalized.length_squared() <= f32::EPSILON {
+                Vec3::Y
+            } else {
+                normalized
+            }
         };
-        let packed_lv = pack_pair(depth_or_valley, eval.land_mask.clamp(0.0, 1.0));
-        packed_attributes.push([packed_ht, packed_sl, packed_mr, packed_lv]);
+        let eval = climate.evaluate(dir);
+        let (face, uv) = dir_to_face_uv(dir);
+        let height = if grid_resolution > 0 {
+            surface_grid.sample_height_uv(face, uv)
+        } else {
+            eval.mountain_offset
+        };
+        let world_pos = dir * (surface_model.radius + height);
+        *v = world_pos;
+
+        let climate_sample = PlanetClimateSample::from_eval(&eval);
+        climate_channels.push(climate_sample.uv1);
+        packed_attributes.push(climate_sample.packed);
+        let biome_u8 = if grid_resolution > 0 {
+            surface_grid.sample_biome_uv(face, uv)
+        } else {
+            let coord = SurfaceCoord { face, uv, height };
+            biome_map
+                .map(|map| sample_biome_face_uv(map, coord))
+                .unwrap_or_else(|| classifier.classify_sample(&climate_sample) as u8)
+        };
+        biome_tags.push([biome_u8 as f32 / 255.0, eval.elev01]);
 
         let mountain_weight = eval.mountain_mask;
         if mountain_weight > 1e-3 {
             let grad = eval.gradient * mountain_weight;
             let mut detail_normal = Vec3::new(-grad.x, 0.6, -grad.z);
             if detail_normal.length_squared() < 1e-6 {
-                detail_normal = unit;
+                detail_normal = dir;
             } else {
                 detail_normal = detail_normal.normalize();
             }
-            let blended = (detail_normal * mountain_weight + unit * (1.0 - mountain_weight))
+            let blended = (detail_normal * mountain_weight + dir * (1.0 - mountain_weight))
                 .normalize_or_zero();
             blended_normals.push(blended);
         } else {
-            blended_normals.push(unit);
+            blended_normals.push(dir);
         }
     }
 
@@ -1466,7 +1793,7 @@ fn build_colored_planet_mesh_with_subdiv(
     );
     mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, verts);
     mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
-    mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
+    mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, biome_tags);
     mesh.insert_attribute(Mesh::ATTRIBUTE_UV_1, climate_channels);
     mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, packed_attributes);
     mesh.insert_indices(Indices::U32(indices_u32));
