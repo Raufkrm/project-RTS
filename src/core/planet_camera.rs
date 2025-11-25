@@ -99,15 +99,19 @@ fn altitude_scaled_wheel_zoom(
     };
     let center = center_tf.translation();
 
-    // accumulate scroll across all events this frame
+    // accumulate scroll across all events this frame, normalized to "lines"
     let mut scroll_lines = 0.0f32;
     for e in wheel.read() {
-        // Treat both Line and Pixel units as “lines” (pixels are usually large in browsers; this is a desktop app)
-        scroll_lines += e.y as f32;
+        let delta = match e.unit {
+            bevy::input::mouse::MouseScrollUnit::Line => e.y.signum(),
+            bevy::input::mouse::MouseScrollUnit::Pixel => (e.y / 120.0).clamp(-1.0, 1.0),
+        } as f32;
+        scroll_lines += delta;
     }
     if scroll_lines.abs() < f32::EPSILON {
         return;
     }
+    scroll_lines = scroll_lines.clamp(-2.0, 2.0);
 
     let base_radius = surface.radius.max(1.0);
     for (mut t, g, cfg) in &mut q_cam {

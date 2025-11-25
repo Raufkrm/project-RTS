@@ -4,4 +4,3 @@ pub mod sampling; // new
 pub mod local_patch;
 pub mod surface_grid;
 pub mod terrain; // your existing file
-pub mod terrain_stream; // new

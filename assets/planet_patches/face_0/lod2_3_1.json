@@ -1,0 +1,10 @@
+{
+    "roughness":  "planet_patches/face_0/lod2_3_1/textures/rock061_roughness.png",
+    "materials":  [
+                      "palette:default"
+                  ],
+    "resolution":  18,
+    "albedo":  "planet_patches/face_0/lod2_3_1/textures/rock061_albedo.png",
+    "type":  "simple_sphere",
+    "normal":  "planet_patches/face_0/lod2_3_1/textures/rock061_normal.png"
+}

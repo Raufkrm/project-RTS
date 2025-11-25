@@ -4,6 +4,7 @@ use crate::core::galaxy_camera::{GalaxyCamera, GalaxyCameraPlugin, MainCamera};
 use crate::core::planet_debug::PlanetDebugPlugin;
 use crate::core::surface_model::PlanetSurfaceModel;
 use crate::core::skybox::{Skybox, SkyboxPlugin, StarfieldAssets};
+<<<<<<< HEAD
 use crate::game::commands::{
     debug_pick_surface_coord, init_surface_pick_res, LastSurfacePick,
 };
@@ -13,14 +14,39 @@ use crate::game::world::planet::{
     spawn_random_planet_inner, spin_planet_clouds, sync_planet_material_uniforms,
     toggle_planet_wireframe, update_planet_lod, AtmosphereMaterial, PlanetDebugConfig,
     PlanetParams, PlanetSettings, PlanetSurfaceMaterial, DEFAULT_BIOME_MAP_RESOLUTION,
+=======
+use crate::game::planet_surface::{
+    asset_loader::PatchAssetState,
+    manager::{update_planet_context, PlanetContext, PlanetLodConfig},
+    procedural_loader::{
+        climate_profiler_finish_frame, process_patch_queue, prune_surface_patches, ClimateProfiler,
+    },
+    render::{
+        attach_prop_gizmos, update_patch_stats, PatchCacheMetrics, PatchMaterialLibrary,
+        PatchRegistry, PatchStats, PropGizmoAssets,
+    },
+    stream::{drain_requests_system, PatchLoadTasks, PatchRequestQueue},
+};
+use crate::game::ui::pause_menu::pause_menu_hidden;
+use crate::game::ui::settings_menu::settings_menu_hidden;
+use crate::game::world::planet::{
+    spawn_random_planet_inner, spin_planet_clouds, sync_orbit_shell_visibility,
+    sync_planet_material_uniforms, toggle_planet_wireframe, update_planet_lod, AtmosphereMaterial,
+    PlanetDebugConfig, PlanetEntity, PlanetParams, PlanetSettings, PlanetSurfaceMaterial,
+    PlanetTag,
+>>>>>>> 4058b87e56e36fbd9e9e3274857e4a83fb032e63
 };
 use crate::game::world::sampling::FlatSamplerRes;
 use crate::game::world::local_patch::{update_local_surface_patch_system, LocalSurfacePatch};
 use crate::game::world::surface_grid::SurfaceGrid;
 use crate::game::world::terrain::MapSettings;
+<<<<<<< HEAD
 use bevy::asset::AssetServer;
 use bevy::ecs::system::SystemParam;
 use bevy::log::{info, warn};
+=======
+use bevy::ecs::schedule::IntoScheduleConfigs;
+>>>>>>> 4058b87e56e36fbd9e9e3274857e4a83fb032e63
 use bevy::{
     camera::visibility::NoFrustumCulling,
     math::{primitives::Sphere, EulerRot, Quat, Vec3, Vec4},
@@ -30,9 +56,12 @@ use bevy::{
         render_resource::AsBindGroup, renderer::RenderDevice, Render, RenderApp, RenderSystems,
     },
 };
+<<<<<<< HEAD
 use std::marker::PhantomData;
 
 pub mod commands;
+=======
+>>>>>>> 4058b87e56e36fbd9e9e3274857e4a83fb032e63
 pub mod planet_surface;
 pub mod ui;
 pub mod units;
@@ -108,10 +137,25 @@ impl Plugin for GamePlugin {
             .init_resource::<PlanetDebugConfig>()
             .init_resource::<SunSettings>()
             .init_resource::<SunDirection>()
+<<<<<<< HEAD
             .init_resource::<PlanetSurfaceModel>()
             .init_resource::<SurfaceGrid>()
             .init_resource::<LocalSurfacePatch>()
             .init_resource::<LastSurfacePick>()
+=======
+            .init_resource::<PlanetEntity>()
+            .init_resource::<PlanetContext>()
+            .init_resource::<PlanetLodConfig>()
+            .init_resource::<PatchRequestQueue>()
+            .init_resource::<PatchLoadTasks>()
+            .init_resource::<PatchAssetState>()
+            .init_resource::<PatchRegistry>()
+            .init_resource::<PatchMaterialLibrary>()
+            .init_resource::<PropGizmoAssets>()
+            .init_resource::<ClimateProfiler>()
+            .init_resource::<PatchStats>()
+            .init_resource::<PatchCacheMetrics>()
+>>>>>>> 4058b87e56e36fbd9e9e3274857e4a83fb032e63
             .add_plugins(MaterialPlugin::<PlanetSurfaceMaterial>::default())
             .add_plugins(MaterialPlugin::<AtmosphereMaterial>::default())
             .add_plugins(WireframePlugin::default())
@@ -119,6 +163,7 @@ impl Plugin for GamePlugin {
             .add_plugins(GalaxyCameraPlugin)
             .add_plugins(SkyboxPlugin)
             .add_plugins(ui::dev_panel::DevPanelPlugin)
+<<<<<<< HEAD
             .configure_sets(
                 Update,
                 InGameSystemSet.run_if(in_state(AppState::InGame)),
@@ -132,9 +177,35 @@ impl Plugin for GamePlugin {
                 (
                     update_ground_anchors_system,
                     update_unit_movement_system,
+=======
+            .add_plugins(ui::pause_menu::PauseMenuPlugin)
+            .add_plugins(ui::settings_menu::SettingsMenuPlugin)
+            .add_systems(
+                Update,
+                (
+                    update_sun_direction_from_transform,
+                    update_planet_lod,
+                    update_planet_context,
+                    sync_orbit_shell_visibility,
+                    drain_requests_system,
+                    process_patch_queue,
+                    attach_prop_gizmos,
+                    climate_profiler_finish_frame,
+                    prune_surface_patches,
+                    sync_planet_material_uniforms,
+                    toggle_planet_wireframe,
+                    sync_sun_with_planet_rotation,
+                    apply_sun_settings,
+                    enforce_sun_visibility,
+                    spin_planet_clouds,
+                    update_patch_stats,
+>>>>>>> 4058b87e56e36fbd9e9e3274857e4a83fb032e63
                 )
-                    .run_if(in_state(AppState::InGame)),
+                    .run_if(in_state(AppState::InGame))
+                    .run_if(pause_menu_hidden)
+                    .run_if(settings_menu_hidden),
             )
+<<<<<<< HEAD
             .add_systems(Update, update_planet_lod.in_set(InGameSystemSet))
             .add_systems(
                 Update,
@@ -165,6 +236,10 @@ impl Plugin for GamePlugin {
                 OnEnter(AppState::InGame),
                 load_planet_patch_manifest,
             );
+=======
+            .add_systems(OnEnter(AppState::InGame), setup_world)
+            .add_systems(OnExit(AppState::InGame), cleanup_ingame_world);
+>>>>>>> 4058b87e56e36fbd9e9e3274857e4a83fb032e63
 
         if let Some(render_app) = app.get_sub_app_mut(RenderApp) {
             render_app.add_systems(
@@ -390,6 +465,7 @@ fn setup_world(
     ));
 }
 
+<<<<<<< HEAD
 fn load_planet_patch_manifest(mut commands: Commands, asset_server: Res<AssetServer>) {
     match PlanetPatchManifest::scan("assets/planet_patches") {
         Ok(manifest) => {
@@ -404,6 +480,39 @@ fn load_planet_patch_manifest(mut commands: Commands, asset_server: Res<AssetSer
         }
         Err(err) => warn!("failed to scan planet patch assets: {err}"),
     }
+=======
+fn cleanup_ingame_world(
+    mut commands: Commands,
+    cameras: Query<Entity, With<MainCamera>>,
+    suns: Query<Entity, With<SunLight>>,
+    planets: Query<Entity, With<PlanetTag>>,
+    mut planet_entity: ResMut<PlanetEntity>,
+    children: Query<&Children>,
+) {
+    for entity in &cameras {
+        despawn_entity_recursive(&mut commands, entity, &children);
+    }
+    for entity in &suns {
+        despawn_entity_recursive(&mut commands, entity, &children);
+    }
+    for entity in &planets {
+        despawn_entity_recursive(&mut commands, entity, &children);
+    }
+    planet_entity.0 = None;
+}
+
+fn despawn_entity_recursive(
+    commands: &mut Commands,
+    entity: Entity,
+    children_q: &Query<&Children>,
+) {
+    if let Ok(children) = children_q.get(entity) {
+        for child in children.iter() {
+            despawn_entity_recursive(commands, child, children_q);
+        }
+    }
+    commands.entity(entity).despawn();
+>>>>>>> 4058b87e56e36fbd9e9e3274857e4a83fb032e63
 }
 
 fn sync_sun_with_planet_rotation(

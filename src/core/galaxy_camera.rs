@@ -1,6 +1,12 @@
+<<<<<<< HEAD
 use crate::core::surface_model::{dir_to_face_uv, PlanetSurfaceModel, SurfaceCoord};
 use crate::game::world::planet::PlanetTag;
 use crate::game::world::surface_grid::SurfaceGrid;
+=======
+use crate::app::AppState;
+use crate::game::ui::pause_menu::pause_menu_hidden;
+use crate::game::ui::settings_menu::settings_menu_hidden;
+>>>>>>> 4058b87e56e36fbd9e9e3274857e4a83fb032e63
 use crate::MessageReader;
 use bevy::input::mouse::{MouseMotion, MouseScrollUnit, MouseWheel};
 use bevy::prelude::*;
@@ -18,6 +24,7 @@ const ORBIT_ROT_SPEED: f32 = 0.004;
 const ORBIT_LAT_LIMIT: f32 = std::f32::consts::FRAC_PI_2 - 0.02;
 /// Extra altitude (in planet radii) we require before auto-dropping back to free mode.
 const ORBIT_EXIT_EXTRA_FACTOR: f32 = 1.2;
+<<<<<<< HEAD
 pub const CAMERA_SURFACE_CLEARANCE: f32 = 20.0;
 const FP_EYE_HEIGHT: f32 = 2.0;
 const FP_SPEED: f32 = 15.0;
@@ -43,6 +50,9 @@ impl Default for PlanetZoomConfig {
         }
     }
 }
+=======
+const ORBIT_ZOOM_RATE: f32 = 0.02;
+>>>>>>> 4058b87e56e36fbd9e9e3274857e4a83fb032e63
 
 #[derive(Component)]
 pub struct MainCamera;
@@ -120,8 +130,18 @@ impl GalaxyCamera {
 pub struct GalaxyCameraPlugin;
 impl Plugin for GalaxyCameraPlugin {
     fn build(&self, app: &mut App) {
+<<<<<<< HEAD
         app.init_resource::<PlanetZoomConfig>()
             .add_systems(Update, camera_controller_system);
+=======
+        app.add_systems(
+            Update,
+            camera_controller_system
+                .run_if(in_state(AppState::InGame))
+                .run_if(pause_menu_hidden)
+                .run_if(settings_menu_hidden),
+        );
+>>>>>>> 4058b87e56e36fbd9e9e3274857e4a83fb032e63
     }
 }
 
@@ -307,8 +327,10 @@ fn camera_controller_system(
             let mut free = state.free;
 
             if buttons.pressed(MouseButton::Right) {
-                free.yaw = wrap_angle(free.yaw + mouse_delta.x * FREE_ROT_SPEED);
-                free.pitch = (free.pitch - mouse_delta.y * FREE_ROT_SPEED).clamp(-1.55, -0.15);
+                let sens = mouse_sensitivity_scale(free.distance, params.radius);
+                free.yaw = wrap_angle(free.yaw + mouse_delta.x * FREE_ROT_SPEED * sens);
+                free.pitch =
+                    (free.pitch - mouse_delta.y * FREE_ROT_SPEED * sens).clamp(-1.55, -0.15);
             }
 
             let forward = direction_from_yaw_pitch(free.yaw, free.pitch);
@@ -472,6 +494,7 @@ fn camera_controller_system(
                 if let Some((_, target_tf)) = maybe_target {
                     let center = target_tf.translation();
 
+<<<<<<< HEAD
                     if buttons.pressed(MouseButton::Right) {
                         orbit.longitude =
                             wrap_angle(orbit.longitude + mouse_delta.x * ORBIT_ROT_SPEED);
@@ -482,6 +505,20 @@ fn camera_controller_system(
                     let (min_r, max_r) = zoom_radius_bounds(&surface_model, &zoom_cfg);
                     let min_alt = zoom_cfg.min_altitude;
                     let max_alt = zoom_cfg.max_altitude;
+=======
+            if buttons.pressed(MouseButton::Right) {
+                let sens = mouse_sensitivity_scale(orbit.altitude + orbit.radius, params.radius);
+                orbit.longitude =
+                    wrap_angle(orbit.longitude + mouse_delta.x * ORBIT_ROT_SPEED * sens);
+                orbit.latitude = (orbit.latitude - mouse_delta.y * ORBIT_ROT_SPEED * sens)
+                    .clamp(-ORBIT_LAT_LIMIT, ORBIT_LAT_LIMIT);
+            }
+
+            if wheel_sum.abs() > f32::EPSILON {
+                let factor = (1.0 - wheel_sum * ORBIT_ZOOM_RATE).clamp(0.4, 1.6);
+                orbit.altitude = (orbit.altitude * factor)
+                    .clamp(ORBIT_MIN_ALT, orbit.radius * ORBIT_MAX_ALT_FACTOR);
+>>>>>>> 4058b87e56e36fbd9e9e3274857e4a83fb032e63
 
                     if orbit.radius <= 0.0 {
                         let radius = transform.translation.distance(center).max(planet_radius);
@@ -734,4 +771,13 @@ fn wrap_angle(mut a: f32) -> f32 {
         a += std::f32::consts::TAU;
     }
     a
+}
+
+fn mouse_sensitivity_scale(distance: f32, radius: f32) -> f32 {
+    let base = radius.max(1.0);
+    let ratio = (distance / base).clamp(0.0, 12.0);
+    let t = (ratio / 6.0).clamp(0.0, 1.0);
+    let min = 0.2;
+    let max = 1.6;
+    min + (max - min) * t
 }

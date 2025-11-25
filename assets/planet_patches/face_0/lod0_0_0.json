@@ -1,0 +1,7 @@
+{
+  "type": "simple_sphere",
+  "resolution": 18,
+  "albedo": "planet_patches/face_0/lod5_0_0/textures/rocky_terrain_02_diff_2k.png",
+  "normal": "planet_patches/face_0/lod5_0_0/textures/rocky_terrain_02_nor_gl_2k.png",
+  "roughness": "planet_patches/face_0/lod5_0_0/textures/rocky_terrain_02_rough_2k.png"
+}
